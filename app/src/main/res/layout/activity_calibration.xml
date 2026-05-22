@@ -1,0 +1,217 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/bg_dark">
+
+    <!-- Top bar -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingHorizontal="12dp"
+        android:background="@color/surface_dark">
+
+        <ImageButton
+            android:id="@+id/btnCalibBack"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:src="@android:drawable/ic_menu_close_clear_cancel"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:tint="@color/text_secondary" />
+
+        <TextView
+            android:id="@+id/tvCalibTitle"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Stride Calibration"
+            android:gravity="center"
+            android:textSize="16sp"
+            android:textColor="@color/text_primary"
+            android:fontFamily="sans-serif-medium" />
+
+        <View android:layout_width="40dp" android:layout_height="40dp" />
+    </LinearLayout>
+
+    <!-- ── PHASE: SELECT ── -->
+    <LinearLayout
+        android:id="@+id/layoutCalibSelect"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:paddingHorizontal="32dp">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="What do you want to calibrate?"
+            android:textSize="17sp"
+            android:textColor="@color/text_primary"
+            android:gravity="center"
+            android:layout_marginBottom="12dp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="You can calibrate both — start with one,\nthen come back for the other."
+            android:textSize="13sp"
+            android:textColor="@color/text_secondary"
+            android:gravity="center"
+            android:layout_marginBottom="40dp" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnCalibWalk"
+            android:layout_width="220dp"
+            android:layout_height="56dp"
+            android:text="🚶  Calibrate Walking"
+            android:textSize="15sp"
+            app:cornerRadius="28dp"
+            android:backgroundTint="@color/color_walking"
+            android:layout_marginBottom="16dp" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnCalibJog"
+            android:layout_width="220dp"
+            android:layout_height="56dp"
+            android:text="🏃  Calibrate Jogging"
+            android:textSize="15sp"
+            app:cornerRadius="28dp"
+            android:backgroundTint="@color/color_running" />
+
+    </LinearLayout>
+
+    <!-- ── PHASE: COUNTING ── -->
+    <LinearLayout
+        android:id="@+id/layoutCalibCounting"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:paddingHorizontal="28dp"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/tvCalibInstructions"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Walk in a straight line for at least 20 steps, then tap Stop."
+            android:textSize="14sp"
+            android:textColor="@color/text_secondary"
+            android:gravity="center"
+            android:lineSpacingMultiplier="1.4"
+            android:layout_marginBottom="32dp" />
+
+        <!-- Live step counter -->
+        <TextView
+            android:id="@+id/tvCalibStepCount"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="0 steps"
+            android:textSize="56sp"
+            android:textColor="@color/text_primary"
+            android:fontFamily="sans-serif-light" />
+
+        <!-- GPS distance -->
+        <TextView
+            android:id="@+id/tvCalibDistance"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="0.0 m"
+            android:textSize="22sp"
+            android:textColor="@color/accent"
+            android:layout_marginTop="8dp" />
+
+        <!-- GPS status -->
+        <TextView
+            android:id="@+id/tvCalibGpsStatus"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="GPS: acquiring…"
+            android:textSize="12sp"
+            android:textColor="@color/text_secondary"
+            android:layout_marginTop="6dp"
+            android:layout_marginBottom="36dp" />
+
+        <!-- Buttons -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnCalibStart"
+            android:layout_width="180dp"
+            android:layout_height="52dp"
+            android:text="▶  Start"
+            android:textSize="16sp"
+            app:cornerRadius="26dp"
+            android:backgroundTint="@color/accent" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnCalibStop"
+            android:layout_width="180dp"
+            android:layout_height="52dp"
+            android:text="■  Stop"
+            android:textSize="16sp"
+            app:cornerRadius="26dp"
+            android:backgroundTint="@color/color_running"
+            android:visibility="gone" />
+
+    </LinearLayout>
+
+    <!-- ── PHASE: RESULT ── -->
+    <LinearLayout
+        android:id="@+id/layoutCalibResult"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:paddingHorizontal="32dp"
+        android:visibility="gone">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="✅  Calibration complete"
+            android:textSize="20sp"
+            android:textColor="@color/text_primary"
+            android:gravity="center"
+            android:layout_marginBottom="24dp" />
+
+        <TextView
+            android:id="@+id/tvCalibStride"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Computed stride: 0.00 m"
+            android:textSize="16sp"
+            android:textColor="@color/text_primary"
+            android:gravity="center"
+            android:lineSpacingMultiplier="1.6"
+            android:background="@drawable/pill_background"
+            android:padding="20dp"
+            android:layout_marginBottom="32dp" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnCalibAccept"
+            android:layout_width="180dp"
+            android:layout_height="52dp"
+            android:text="✓  Accept &amp; Save"
+            android:textSize="15sp"
+            app:cornerRadius="26dp"
+            android:backgroundTint="@color/accent"
+            android:layout_marginBottom="12dp" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnCalibRetry"
+            android:layout_width="180dp"
+            android:layout_height="52dp"
+            android:text="↺  Try Again"
+            android:textSize="15sp"
+            app:cornerRadius="26dp"
+            android:backgroundTint="@color/surface_dark"
+            app:strokeColor="@color/accent"
+            app:strokeWidth="1dp" />
+
+    </LinearLayout>
+
+</LinearLayout>

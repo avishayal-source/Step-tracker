@@ -1,0 +1,184 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/bg_dark">
+
+    <!-- Top bar -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingHorizontal="12dp"
+        android:background="@color/surface_dark">
+
+        <ImageButton
+            android:id="@+id/btnBack"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:src="@android:drawable/ic_media_previous"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:tint="@color/text_secondary" />
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="WORKOUT SCHEDULE"
+            android:gravity="center"
+            android:textSize="13sp"
+            android:letterSpacing="0.15"
+            android:textColor="@color/text_secondary"
+            android:fontFamily="sans-serif-medium" />
+
+        <View android:layout_width="40dp" android:layout_height="40dp" />
+    </LinearLayout>
+
+    <!-- Running overlay (visible during schedule run) -->
+    <LinearLayout
+        android:id="@+id/layoutRunning"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:paddingVertical="16dp"
+        android:paddingHorizontal="24dp"
+        android:background="@color/surface_dark">
+
+        <TextView
+            android:id="@+id/tvCurrentPeriod"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="🚶 Walking  ·  period 1 of 5"
+            android:textSize="17sp"
+            android:textColor="@color/text_primary" />
+
+        <TextView
+            android:id="@+id/tvCountdown"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="0:00"
+            android:textSize="52sp"
+            android:textColor="@color/text_primary"
+            android:fontFamily="sans-serif-light"
+            android:layout_marginTop="4dp" />
+
+        <ProgressBar
+            android:id="@+id/progressBar"
+            style="?android:attr/progressBarStyleHorizontal"
+            android:layout_width="match_parent"
+            android:layout_height="8dp"
+            android:layout_marginTop="8dp"
+            android:progressTint="@color/accent"
+            android:progressBackgroundTint="#2A2D40"
+            android:max="100" />
+
+    </LinearLayout>
+
+    <!-- Totals bar -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:paddingHorizontal="16dp"
+        android:paddingVertical="10dp"
+        android:gravity="center_vertical">
+
+        <TextView
+            android:id="@+id/tvTotalWalk"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="🚶 Walk total: 0m"
+            android:textSize="13sp"
+            android:textColor="@color/text_secondary" />
+
+        <TextView
+            android:id="@+id/tvTotalJog"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="🏃 Jog total: 0m"
+            android:textSize="13sp"
+            android:textColor="@color/text_secondary"
+            android:gravity="end" />
+
+    </LinearLayout>
+
+    <!-- Schedule list -->
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/rvSchedule"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:paddingHorizontal="12dp"
+        android:paddingBottom="8dp"
+        android:clipToPadding="false" />
+
+    <!-- Bottom controls -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingHorizontal="16dp"
+        android:paddingVertical="12dp"
+        android:background="@color/surface_dark">
+
+        <!-- Add buttons -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:gravity="center">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnAddWalk"
+                android:layout_width="0dp"
+                android:layout_height="44dp"
+                android:layout_weight="1"
+                android:layout_marginEnd="6dp"
+                android:text="+ Walk"
+                android:textSize="14sp"
+                app:cornerRadius="22dp"
+                android:backgroundTint="@color/color_walking" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/btnAddJog"
+                android:layout_width="0dp"
+                android:layout_height="44dp"
+                android:layout_weight="1"
+                android:layout_marginStart="6dp"
+                android:text="+ Jog"
+                android:textSize="14sp"
+                app:cornerRadius="22dp"
+                android:backgroundTint="@color/color_running" />
+
+        </LinearLayout>
+
+        <!-- Hint -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Swipe to delete  ·  drag to reorder  ·  tap ±  to adjust"
+            android:gravity="center"
+            android:textSize="11sp"
+            android:textColor="@color/text_secondary"
+            android:layout_marginTop="6dp"
+            android:layout_marginBottom="8dp" />
+
+        <!-- Start/Stop -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnStartStop"
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
+            android:text="▶  Start"
+            android:textSize="16sp"
+            app:cornerRadius="26dp"
+            android:backgroundTint="@color/accent" />
+
+    </LinearLayout>
+
+</LinearLayout>

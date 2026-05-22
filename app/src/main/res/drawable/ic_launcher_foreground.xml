@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Background circle -->
+    <path
+        android:fillColor="#5B6BFF"
+        android:pathData="M54,12 C31,12 12,31 12,54 C12,77 31,96 54,96 C77,96 96,77 96,54 C96,31 77,12 54,12Z"/>
+
+    <!-- Running figure body -->
+    <!-- Head -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M54,22 m-5,0 a5,5 0 1,0 10,0 a5,5 0 1,0 -10,0"/>
+
+    <!-- Torso leaning forward -->
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="4"
+        android:strokeLineCap="round"
+        android:pathData="M52,32 L46,52"/>
+
+    <!-- Back arm up -->
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="3.5"
+        android:strokeLineCap="round"
+        android:pathData="M50,36 L40,28"/>
+
+    <!-- Front arm down/back -->
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="3.5"
+        android:strokeLineCap="round"
+        android:pathData="M50,40 L58,50"/>
+
+    <!-- Front leg extended forward -->
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="4"
+        android:strokeLineCap="round"
+        android:pathData="M46,52 L58,62 L64,76"/>
+
+    <!-- Back leg bent back -->
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="4"
+        android:strokeLineCap="round"
+        android:pathData="M46,52 L40,64 L44,78"/>
+
+    <!-- Speed lines -->
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="2.5"
+        android:strokeLineCap="round"
+        android:strokeAlpha="0.5"
+        android:pathData="M68,38 L80,38"/>
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="2"
+        android:strokeLineCap="round"
+        android:strokeAlpha="0.35"
+        android:pathData="M70,46 L82,46"/>
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="1.5"
+        android:strokeLineCap="round"
+        android:strokeAlpha="0.2"
+        android:pathData="M72,54 L80,54"/>
+
+</vector>

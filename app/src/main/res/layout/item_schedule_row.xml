@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="52dp"
+    android:orientation="horizontal"
+    android:gravity="center_vertical"
+    android:paddingHorizontal="16dp"
+    android:layout_marginVertical="2dp">
+
+    <!-- Activity label -->
+    <TextView
+        android:id="@+id/tvRowLabel"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:textSize="15sp"
+        android:textColor="@color/text_primary" />
+
+    <!-- Done checkmark (visible during run when completed) -->
+    <ImageView
+        android:id="@+id/ivDone"
+        android:layout_width="20dp"
+        android:layout_height="20dp"
+        android:src="@android:drawable/checkbox_on_background"
+        android:tint="#44DD88"
+        android:layout_marginEnd="8dp"
+        android:visibility="gone" />
+
+    <!-- Minus -->
+    <ImageButton
+        android:id="@+id/btnMinus"
+        android:layout_width="32dp"
+        android:layout_height="32dp"
+        android:src="@android:drawable/ic_input_delete"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:tint="@color/text_secondary" />
+
+    <!-- Duration -->
+    <TextView
+        android:id="@+id/tvRowDuration"
+        android:layout_width="52dp"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:textSize="15sp"
+        android:textColor="@color/text_primary"
+        android:fontFamily="monospace" />
+
+    <!-- Plus -->
+    <ImageButton
+        android:id="@+id/btnPlus"
+        android:layout_width="32dp"
+        android:layout_height="32dp"
+        android:src="@android:drawable/ic_input_add"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:tint="@color/text_secondary" />
+
+</LinearLayout>

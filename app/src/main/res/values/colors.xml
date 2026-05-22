@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- App background -->
+    <color name="bg_dark">#0F1117</color>
+    <color name="surface_dark">#1A1D27</color>
+
+    <!-- Text -->
+    <color name="text_primary">#F0F2FF</color>
+    <color name="text_secondary">#7B7F9E</color>
+
+    <!-- Accent (blue-purple) -->
+    <color name="accent">#5B6BFF</color>
+
+    <!-- Activity log cards -->
+    <color name="color_running">#CC3A6BFF</color>
+    <color name="color_walking">#CC1EAA72</color>
+    <color name="color_idle">#CC4A4A66</color>
+
+    <!-- Tracking stat mini-cards -->
+    <color name="color_walking_card">#221EAA72</color>
+    <color name="color_running_card">#223A6BFF</color>
+
+    <!-- Schedule row backgrounds -->
+    <color name="color_walking_dim">#1A1EAA72</color>
+    <color name="color_running_dim">#1A3A6BFF</color>
+    <color name="color_active_period">#505B6BFF</color>
+    <color name="color_done_period">#12FFFFFF</color>
+    <color name="icon_bg">#1A1D27</color>
+</resources>
