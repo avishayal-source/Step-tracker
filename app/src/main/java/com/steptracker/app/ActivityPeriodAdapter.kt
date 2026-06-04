@@ -74,5 +74,5 @@ class ActivityPeriodAdapter(private val periods: MutableList<ActivityPeriod>) :
         return if (m > 0) "${m}m ${s}s" else "${s}s"
     }
 
-    private fun formatDist(m: Double) = if (m >= 1000) "${"%.2f".format(m/1000)} km" else "${m.toInt()} m"
+    private fun formatDist(m: Double) = Format.dist(m)
 }

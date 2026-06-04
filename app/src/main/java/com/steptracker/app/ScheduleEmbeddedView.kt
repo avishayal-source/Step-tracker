@@ -98,6 +98,11 @@ class ScheduleEmbeddedView(
                         scheduleManager.removePeriod(pos)
                         schedule.removeAt(pos)
                         scheduleAdapter.notifyItemRemoved(pos)
+                        // Keep view list, manager list and totals in sync after removal.
+                        syncScheduleFromManager(scheduleManager.getItems())
+                        scheduleAdapter.setActiveIndex(scheduleManager.currentIndex)
+                        refreshTotals()
+                        persistRunState()
                     } else {
                         scheduleAdapter.notifyItemChanged(pos)
                         Toast.makeText(activity, "Can't remove current or past periods", Toast.LENGTH_SHORT).show()

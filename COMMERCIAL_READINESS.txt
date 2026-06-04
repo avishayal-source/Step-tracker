@@ -1,0 +1,61 @@
+================================================================================
+STEP TRACKER ("Let's GO") - WHAT'S NEEDED TO MAKE THIS APP COMMERCIAL
+================================================================================
+Generated: 2026-06-04
+Repository: https://github.com/avishayal-source/Step-tracker.git
+
+--------------------------------------------------------------------------------
+MUST-HAVE BEFORE RELEASE
+--------------------------------------------------------------------------------
+- Play Store assets
+    * App icon (adaptive, 512px)
+    * Feature graphic
+    * Screenshots (phone + tablet)
+
+- Privacy policy
+    * Required for apps using location and activity recognition.
+    * Must be hosted at a public URL and linked in the Play Console listing.
+
+- Release build
+    * Enable minifyEnabled true
+    * Add ProGuard / R8 rules
+    * Sign with a release keystore (keep the keystore + passwords backed up safely)
+
+- Background tracking
+    * The current wake lock is deprecated.
+    * Switch to WorkManager or a proper foreground service with a persistent
+      notification that survives battery optimization (Doze / App Standby).
+
+- Onboarding flow
+    * First-launch permissions explanation.
+    * Google requires a clear rationale for ACTIVITY_RECOGNITION and location.
+
+--------------------------------------------------------------------------------
+IMPORTANT QUALITY IMPROVEMENTS
+--------------------------------------------------------------------------------
+- FusedLocationProviderClient (Google Play Services)
+    * Replace raw LocationManager.
+    * Significantly better GPS accuracy; handles indoor/outdoor transitions.
+
+- Unit tests
+    * Especially for the classifier and distance calculation.
+
+- Crash reporting
+    * Firebase Crashlytics (or similar).
+
+- Accessibility
+    * Content descriptions for screen readers.
+    * Sufficient color contrast and touch target sizes.
+
+--------------------------------------------------------------------------------
+NICE-TO-HAVE / DIFFERENTIATION
+--------------------------------------------------------------------------------
+- Pace (min/km) displayed live
+- Heart rate zone integration (if a Wear OS companion is built)
+- Route map display (Google Maps SDK)
+- Goal setting (daily step target with notification)
+- Export to CSV / share workout
+
+================================================================================
+END OF DOCUMENT
+================================================================================

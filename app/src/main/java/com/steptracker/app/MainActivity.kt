@@ -208,7 +208,8 @@ class MainActivity : AppCompatActivity() {
     private fun startTrackingService() {
         ContextCompat.startForegroundService(this,
             Intent(this, StepTrackerService::class.java).apply { action = StepTrackerService.ACTION_START })
-        if (!isBound) bindService(Intent(this, StepTrackerService::class.java), connection, Context.BIND_AUTO_CREATE)
+        // Service is already bound in onCreate(); no second bindService here to avoid
+        // a duplicate ServiceConnection (which Android reports as a leak).
         stopwatchHandler.removeCallbacks(stopwatchRunnable)
         stopwatchHandler.post(stopwatchRunnable)
     }
@@ -321,7 +322,7 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun formatDist(m: Double) = if (m >= 1000) "${"%.1f".format(m/1000)} km" else "${m.toInt()} m"
+    private fun formatDist(m: Double) = Format.dist(m)
 
     private fun formatElapsed(ms: Long): String {
         val totalSec = TimeUnit.MILLISECONDS.toSeconds(ms)
@@ -359,7 +360,7 @@ class HistoryAdapter(
 
     override fun onBindViewHolder(h: VH, pos: Int) {
         val r = records[pos]
-        fun fDist(m: Double) = if (m >= 1000) "${"%.1f".format(m/1000)}km" else "${m.toInt()}m"
+        fun fDist(m: Double) = Format.dist(m)
         fun fDur(ms: Long): String {
             val min = TimeUnit.MILLISECONDS.toMinutes(ms)
             val sec = TimeUnit.MILLISECONDS.toSeconds(ms) % 60

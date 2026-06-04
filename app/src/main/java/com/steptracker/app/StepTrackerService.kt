@@ -1,15 +1,18 @@
 package com.steptracker.app
 
+import android.Manifest
 import android.app.*
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.content.pm.ServiceInfo
 import android.hardware.Sensor
 import android.hardware.SensorManager
 import android.location.*
 import android.os.*
 import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
+import androidx.core.content.ContextCompat
 
 class StepTrackerService : Service(), StepDetector.StepListener {
 
@@ -51,9 +54,9 @@ class StepTrackerService : Service(), StepDetector.StepListener {
             val prev = lastGpsLocation
             lastGpsLocation = loc
 
-            if (prev == null) return   // first fix — no reference point yet
+            if (prev == null) return   // need a reference point before measuring a delta
 
-            val delta       = prev.distanceTo(loc).toDouble()
+            val delta        = prev.distanceTo(loc).toDouble()
             val timeDeltaSec = ((loc.time - prev.time) / 1000.0).coerceAtLeast(0.001)
             val impliedSpeed = delta / timeDeltaSec   // m/s
 
@@ -61,7 +64,15 @@ class StepTrackerService : Service(), StepDetector.StepListener {
             if (impliedSpeed > 8.0) return
             if (delta < 0.5 || delta > 200.0) return
 
-            currentPeriod?.gpsDistanceM = (currentPeriod?.gpsDistanceM ?: 0.0) + delta
+            // Capture each period's baseline the first time it receives a GPS delta.
+            // This works across activity switches (a new period gets its own baseline).
+            currentPeriod?.let { p ->
+                if (!p.gpsEngaged) {
+                    p.stepDistanceAtGpsStartM = p.stepDistanceM
+                    p.gpsEngaged = true
+                }
+                p.gpsDistanceM += delta
+            }
             recomputeTotals()
             onUpdateListener?.invoke()
         }
@@ -83,6 +94,10 @@ class StepTrackerService : Service(), StepDetector.StepListener {
     // FIX #5: guard so history is saved exactly once per session
     private var historySaved = false
 
+    // Throttle: the notification is a system call; rebuilding it on every step
+    // (~3/sec while running) wastes CPU/battery and gets rate-limited by Android.
+    private var lastNotifUpdateMs = 0L
+
     var onUpdateListener: (() -> Unit)? = null
 
     // ── Lifecycle ─────────────────────────────────────────────────────────────
@@ -95,10 +110,9 @@ class StepTrackerService : Service(), StepDetector.StepListener {
         stepDetector    = StepDetector(this)
         locationManager = getSystemService(Context.LOCATION_SERVICE) as LocationManager
         val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
-        @Suppress("DEPRECATION")
-        wakeLock = pm.newWakeLock(
-            PowerManager.SCREEN_DIM_WAKE_LOCK or PowerManager.ON_AFTER_RELEASE,
-            "letsgo:tracking")
+        // PARTIAL_WAKE_LOCK keeps the CPU running for sensor delivery without forcing
+        // the screen on (SCREEN_DIM_WAKE_LOCK was deprecated and wasted battery).
+        wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "letsgo:tracking")
         createNotificationChannel()
     }
 
@@ -133,7 +147,39 @@ class StepTrackerService : Service(), StepDetector.StepListener {
         startGps()
         if (!wakeLock.isHeld) wakeLock.acquire(4 * 60 * 60 * 1000L)
         openNewPeriod(seed, System.currentTimeMillis())
-        startForeground(NOTIFICATION_ID, buildNotification("Tracking…"))
+        startInForeground(buildNotification("Tracking…"))
+    }
+
+    /**
+     * Starts the foreground service with a service type that matches the permissions
+     * actually granted. On Android 14 (API 34) calling startForeground with a
+     * `location` type while ACCESS_*_LOCATION is denied throws SecurityException and
+     * crashes the app. We therefore build the type bitmask from granted permissions.
+     */
+    private fun startInForeground(notification: Notification) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+            startForeground(NOTIFICATION_ID, notification)
+            return
+        }
+        var type = 0
+        val hasLocation =
+            ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
+            ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
+        if (hasLocation) type = type or ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
+
+        // HEALTH type exists from API 34 and requires ACTIVITY_RECOGNITION (or BODY_SENSORS)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            val hasActivity = ContextCompat.checkSelfPermission(
+                this, Manifest.permission.ACTIVITY_RECOGNITION) == PackageManager.PERMISSION_GRANTED
+            if (hasActivity) type = type or ServiceInfo.FOREGROUND_SERVICE_TYPE_HEALTH
+        }
+
+        try {
+            if (type != 0) startForeground(NOTIFICATION_ID, notification, type)
+            else startForeground(NOTIFICATION_ID, notification)
+        } catch (e: Exception) {
+            try { startForeground(NOTIFICATION_ID, notification) } catch (_: Exception) {}
+        }
     }
 
     fun sessionElapsedMs(): Long =
@@ -223,7 +269,11 @@ class StepTrackerService : Service(), StepDetector.StepListener {
         totalSteps++
         currentPeriod?.steps = (currentPeriod?.steps ?: 0) + 1
         recomputeTotals()
-        updateNotification(buildStatusText())
+        val now = System.currentTimeMillis()
+        if (now - lastNotifUpdateMs >= 1000L) {
+            lastNotifUpdateMs = now
+            updateNotification(buildStatusText())
+        }
         onUpdateListener?.invoke()
     }
 
@@ -237,8 +287,6 @@ class StepTrackerService : Service(), StepDetector.StepListener {
             p.endTime = now
             if (p.endTime <= p.startTime) p.endTime = p.startTime + 1000
         }
-        if (prev != null && prev.type == ActivityType.IDLE && prev.durationMs < 2000)
-            activityPeriods.remove(prev)
         openNewPeriod(newActivity, now)
         recomputeTotals()
         onUpdateListener?.invoke()
@@ -288,7 +336,7 @@ class StepTrackerService : Service(), StepDetector.StepListener {
         return "$act · $totalSteps steps · ${formatDist(walkDistM + runDistM)}$gps"
     }
 
-    fun formatDist(m: Double) = if (m >= 1000) "${"%.2f".format(m/1000)} km" else "${m.toInt()} m"
+    fun formatDist(m: Double) = Format.dist(m)
 
     // ── Notification ──────────────────────────────────────────────────────────
 
