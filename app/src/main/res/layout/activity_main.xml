@@ -4,36 +4,44 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:background="@color/bg_dark">
+    android:background="@android:color/transparent">
 
     <!-- Title bar -->
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="56dp"
+        android:layout_height="58dp"
         android:orientation="horizontal"
         android:gravity="center_vertical"
         android:paddingHorizontal="20dp"
-        android:background="@color/surface_dark">
+        android:background="@android:color/transparent">
         <TextView
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:text="LET'S GO"
-            android:textSize="18sp"
-            android:letterSpacing="0.2"
+            android:text="⚡ LET'S GO"
+            android:textSize="20sp"
+            android:letterSpacing="0.18"
             android:textColor="@color/text_primary"
-            android:fontFamily="sans-serif-medium" />
+            android:fontFamily="sans-serif-black" />
     </LinearLayout>
+
+    <!-- Gradient accent underline -->
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="2dp"
+        android:layout_marginHorizontal="20dp"
+        android:background="@drawable/bg_accent_gradient_bar" />
 
     <!-- Tabs -->
     <com.google.android.material.tabs.TabLayout
         android:id="@+id/tabLayout"
         android:layout_width="match_parent"
         android:layout_height="48dp"
-        android:background="@color/surface_dark"
+        android:background="@android:color/transparent"
         app:tabTextColor="@color/text_secondary"
         app:tabSelectedTextColor="@color/text_primary"
         app:tabIndicatorColor="@color/accent"
+        app:tabIndicatorFullWidth="false"
         app:tabIndicatorHeight="3dp">
         <com.google.android.material.tabs.TabItem
             android:layout_width="wrap_content"
@@ -62,224 +70,195 @@
             android:orientation="vertical"
             android:paddingBottom="32dp">
 
-            <!-- ── Hero card ─────────────────────────────────────────────── -->
+            <!-- ── Hero card (gradient) ──────────────────────────────────── -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
                 android:gravity="center"
-                android:background="@color/surface_dark">
+                android:background="@drawable/bg_hero"
+                android:paddingTop="22dp"
+                android:paddingBottom="22dp"
+                android:paddingHorizontal="20dp"
+                android:elevation="6dp">
 
-                <!-- Accent top bar -->
-                <View
-                    android:layout_width="match_parent"
-                    android:layout_height="3dp"
-                    android:background="@color/accent" />
-
+                <!-- Activity pill + GPS -->
                 <LinearLayout
-                    android:layout_width="match_parent"
+                    android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:orientation="vertical"
-                    android:gravity="center"
-                    android:paddingTop="18dp"
-                    android:paddingBottom="16dp"
-                    android:paddingHorizontal="20dp">
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
 
-                    <!-- Activity pill + GPS -->
-                    <LinearLayout
+                    <TextView
+                        android:id="@+id/tvCurrentActivity"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:orientation="horizontal"
-                        android:gravity="center_vertical">
+                        android:text="Not tracking"
+                        android:textSize="14sp"
+                        android:textColor="@color/text_primary"
+                        android:background="@drawable/pill_background"
+                        android:paddingHorizontal="18dp"
+                        android:paddingVertical="7dp" />
 
-                        <TextView
-                            android:id="@+id/tvCurrentActivity"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text="Not tracking"
-                            android:textSize="14sp"
-                            android:textColor="@color/text_primary"
-                            android:background="@drawable/pill_background"
-                            android:paddingHorizontal="16dp"
-                            android:paddingVertical="5dp" />
-
-                        <TextView
-                            android:id="@+id/tvGpsIndicator"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:text=""
-                            android:textSize="11sp"
-                            android:textColor="@color/accent"
-                            android:layout_marginStart="10dp" />
-                    </LinearLayout>
-
-                    <!-- Step sizes (calibrated) -->
                     <TextView
-                        android:id="@+id/tvStepSizes"
+                        android:id="@+id/tvGpsIndicator"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:text=""
                         android:textSize="11sp"
-                        android:textColor="@color/text_secondary"
-                        android:layout_marginTop="6dp" />
-
-                    <!-- Step count -->
-                    <TextView
-                        android:id="@+id/tvStepCount"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="0"
-                        android:textSize="56sp"
-                        android:textColor="@color/text_primary"
-                        android:fontFamily="sans-serif-thin"
-                        android:layout_marginTop="6dp" />
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="STEPS"
-                        android:textSize="10sp"
-                        android:letterSpacing="0.2"
-                        android:textColor="@color/text_secondary"
-                        android:layout_marginTop="-8dp" />
-
-                    <!-- Session time -->
-                    <TextView
-                        android:id="@+id/tvSessionElapsed"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="00:00"
-                        android:textSize="20sp"
-                        android:textColor="@color/text_primary"
-                        android:fontFamily="sans-serif-light"
-                        android:layout_marginTop="8dp"
-                        android:visibility="gone" />
-
-                    <TextView
-                        android:id="@+id/tvSessionElapsedLabel"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="SESSION TIME"
-                        android:textSize="9sp"
-                        android:letterSpacing="0.15"
-                        android:textColor="@color/text_secondary"
-                        android:visibility="gone" />
-
-                    <!-- Total distance -->
-                    <TextView
-                        android:id="@+id/tvTotalDist"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="0 m"
-                        android:textSize="34sp"
-                        android:textColor="@color/accent"
-                        android:layout_marginTop="10dp" />
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="TOTAL DISTANCE"
-                        android:textSize="9sp"
-                        android:letterSpacing="0.15"
-                        android:textColor="@color/text_secondary"
-                        android:layout_marginTop="-4dp" />
-
-                    <!-- Thin divider -->
-                    <View
-                        android:layout_width="48dp"
-                        android:layout_height="1dp"
-                        android:background="@color/divider"
-                        android:layout_marginVertical="12dp" />
-
-                    <!-- Walk / Run split cards -->
-                    <LinearLayout
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:orientation="horizontal">
-
-                        <androidx.cardview.widget.CardView
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:layout_marginEnd="5dp"
-                            app:cardBackgroundColor="@color/color_walking_card"
-                            app:cardCornerRadius="14dp"
-                            app:cardElevation="0dp">
-                            <TextView
-                                android:id="@+id/tvWalkStats"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="🚶 Walk\n0 steps\n0 m"
-                                android:textColor="@color/text_primary"
-                                android:textSize="13sp"
-                                android:lineSpacingMultiplier="1.5"
-                                android:padding="14dp" />
-                        </androidx.cardview.widget.CardView>
-
-                        <androidx.cardview.widget.CardView
-                            android:layout_width="0dp"
-                            android:layout_height="wrap_content"
-                            android:layout_weight="1"
-                            android:layout_marginStart="5dp"
-                            app:cardBackgroundColor="@color/color_running_card"
-                            app:cardCornerRadius="14dp"
-                            app:cardElevation="0dp">
-                            <TextView
-                                android:id="@+id/tvRunStats"
-                                android:layout_width="wrap_content"
-                                android:layout_height="wrap_content"
-                                android:text="🏃 Run\n0 steps\n0 m"
-                                android:textColor="@color/text_primary"
-                                android:textSize="13sp"
-                                android:lineSpacingMultiplier="1.5"
-                                android:padding="14dp" />
-                        </androidx.cardview.widget.CardView>
-                    </LinearLayout>
-
-                    <!-- Buttons -->
-                    <LinearLayout
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:orientation="horizontal"
-                        android:layout_marginTop="16dp">
-
-                        <com.google.android.material.button.MaterialButton
-                            android:id="@+id/btnStartStop"
-                            android:layout_width="136dp"
-                            android:layout_height="50dp"
-                            android:text="▶  Start"
-                            android:textSize="15sp"
-                            android:letterSpacing="0.03"
-                            app:cornerRadius="25dp"
-                            android:backgroundTint="@color/accent" />
-
-                        <com.google.android.material.button.MaterialButton
-                            android:id="@+id/btnReset"
-                            android:layout_width="90dp"
-                            android:layout_height="50dp"
-                            android:text="↺  Reset"
-                            android:textSize="12sp"
-                            android:layout_marginStart="8dp"
-                            app:cornerRadius="25dp"
-                            android:backgroundTint="@color/bg_dark"
-                            app:strokeColor="@color/text_hint"
-                            app:strokeWidth="1dp"
-                            android:visibility="gone" />
-
-                        <com.google.android.material.button.MaterialButton
-                            android:id="@+id/btnCalibrate"
-                            android:layout_width="wrap_content"
-                            android:layout_height="50dp"
-                            android:text="⚙  Calibrate"
-                            android:textSize="12sp"
-                            android:layout_marginStart="8dp"
-                            app:cornerRadius="25dp"
-                            android:backgroundTint="@color/bg_dark"
-                            app:strokeColor="@color/accent"
-                            app:strokeWidth="1dp" />
-                    </LinearLayout>
-
+                        android:textColor="@color/accent_cyan"
+                        android:layout_marginStart="10dp" />
                 </LinearLayout>
+
+                <!-- Step sizes (calibrated) -->
+                <TextView
+                    android:id="@+id/tvStepSizes"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text=""
+                    android:textSize="11sp"
+                    android:textColor="@color/text_secondary"
+                    android:layout_marginTop="8dp" />
+
+                <!-- Step count -->
+                <TextView
+                    android:id="@+id/tvStepCount"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="0"
+                    android:textSize="64sp"
+                    android:textColor="@color/text_primary"
+                    android:fontFamily="sans-serif-thin"
+                    android:layout_marginTop="6dp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="STEPS"
+                    android:textSize="10sp"
+                    android:letterSpacing="0.25"
+                    android:textColor="@color/accent_cyan"
+                    android:layout_marginTop="-10dp" />
+
+                <!-- Session time -->
+                <TextView
+                    android:id="@+id/tvSessionElapsed"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="00:00"
+                    android:textSize="20sp"
+                    android:textColor="@color/text_primary"
+                    android:fontFamily="sans-serif-light"
+                    android:layout_marginTop="10dp"
+                    android:visibility="gone" />
+
+                <TextView
+                    android:id="@+id/tvSessionElapsedLabel"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="SESSION TIME"
+                    android:textSize="9sp"
+                    android:letterSpacing="0.15"
+                    android:textColor="@color/text_secondary"
+                    android:visibility="gone" />
+
+                <!-- Total distance -->
+                <TextView
+                    android:id="@+id/tvTotalDist"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="0 m"
+                    android:textSize="38sp"
+                    android:textColor="@color/accent"
+                    android:fontFamily="sans-serif-medium"
+                    android:layout_marginTop="12dp" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="TOTAL DISTANCE"
+                    android:textSize="9sp"
+                    android:letterSpacing="0.2"
+                    android:textColor="@color/text_secondary"
+                    android:layout_marginTop="-4dp" />
+
+                <!-- Walk / Run split cards -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:layout_marginTop="18dp">
+
+                    <TextView
+                        android:id="@+id/tvWalkStats"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:layout_marginEnd="5dp"
+                        android:background="@drawable/card_stat_walk"
+                        android:text="🚶 Walk\n0 steps\n0 m"
+                        android:textColor="@color/text_primary"
+                        android:textSize="13sp"
+                        android:lineSpacingMultiplier="1.5"
+                        android:padding="16dp" />
+
+                    <TextView
+                        android:id="@+id/tvRunStats"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:layout_marginStart="5dp"
+                        android:background="@drawable/card_stat_run"
+                        android:text="🏃 Run\n0 steps\n0 m"
+                        android:textColor="@color/text_primary"
+                        android:textSize="13sp"
+                        android:lineSpacingMultiplier="1.5"
+                        android:padding="16dp" />
+                </LinearLayout>
+
+                <!-- Buttons -->
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:layout_marginTop="18dp">
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnStartStop"
+                        android:layout_width="140dp"
+                        android:layout_height="52dp"
+                        android:text="▶  Start"
+                        android:textSize="16sp"
+                        android:letterSpacing="0.03"
+                        app:cornerRadius="26dp"
+                        android:backgroundTint="@color/accent" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnReset"
+                        android:layout_width="92dp"
+                        android:layout_height="52dp"
+                        android:text="↺  Reset"
+                        android:textSize="12sp"
+                        android:layout_marginStart="8dp"
+                        app:cornerRadius="26dp"
+                        android:backgroundTint="@color/surface_elevated"
+                        app:strokeColor="@color/text_hint"
+                        app:strokeWidth="1dp"
+                        android:visibility="gone" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnCalibrate"
+                        android:layout_width="wrap_content"
+                        android:layout_height="52dp"
+                        android:text="⚙  Calibrate"
+                        android:textSize="12sp"
+                        android:layout_marginStart="8dp"
+                        app:cornerRadius="26dp"
+                        android:backgroundTint="@color/surface_elevated"
+                        app:strokeColor="@color/accent"
+                        app:strokeWidth="1dp" />
+                </LinearLayout>
+
             </LinearLayout>
 
             <!-- ── Debug metrics card ─────────────────────────────────── -->
@@ -287,19 +266,20 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
-                android:paddingHorizontal="16dp"
-                android:paddingTop="14dp"
-                android:paddingBottom="4dp">
+                android:layout_marginHorizontal="16dp"
+                android:layout_marginTop="16dp"
+                android:background="@drawable/bg_surface_card"
+                android:padding="14dp">
 
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="DEBUG"
+                    android:text="⚙ DEBUG METRICS"
                     android:textSize="10sp"
                     android:letterSpacing="0.15"
-                    android:textColor="@color/text_hint"
+                    android:textColor="@color/accent_cyan"
                     android:fontFamily="sans-serif-medium"
-                    android:paddingBottom="4dp" />
+                    android:paddingBottom="6dp" />
 
                 <TextView
                     android:id="@+id/tvDebugInfo"
@@ -309,9 +289,7 @@
                     android:textSize="11sp"
                     android:textColor="@color/text_secondary"
                     android:fontFamily="monospace"
-                    android:lineSpacingMultiplier="1.5"
-                    android:background="@color/surface_dark"
-                    android:padding="10dp" />
+                    android:lineSpacingMultiplier="1.5" />
             </LinearLayout>
 
             <!-- ── Activity log ───────────────────────────────────────── -->
@@ -320,18 +298,18 @@
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
                 android:gravity="center_vertical"
-                android:paddingHorizontal="16dp"
-                android:paddingTop="14dp"
-                android:paddingBottom="4dp">
+                android:paddingHorizontal="20dp"
+                android:paddingTop="20dp"
+                android:paddingBottom="6dp">
 
                 <TextView
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:text="ACTIVITY LOG"
-                    android:textSize="10sp"
-                    android:letterSpacing="0.15"
-                    android:textColor="@color/text_secondary"
+                    android:textSize="11sp"
+                    android:letterSpacing="0.18"
+                    android:textColor="@color/text_primary"
                     android:fontFamily="sans-serif-medium" />
 
                 <TextView
@@ -348,9 +326,9 @@
                 android:id="@+id/tvEmptyHint"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="Start tracking to see your activity log here"
+                android:text="👟 Start tracking to see your activity log here"
                 android:gravity="center"
-                android:paddingVertical="24dp"
+                android:paddingVertical="28dp"
                 android:paddingHorizontal="24dp"
                 android:textColor="@color/text_secondary"
                 android:textSize="13sp" />
@@ -382,9 +360,10 @@
             android:layout_height="wrap_content"
             android:orientation="vertical"
             android:gravity="center"
-            android:paddingVertical="16dp"
+            android:paddingVertical="20dp"
             android:paddingHorizontal="24dp"
-            android:background="@color/surface_dark"
+            android:background="@drawable/bg_hero"
+            android:elevation="4dp"
             android:visibility="gone">
 
             <TextView
@@ -400,7 +379,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:text="0:00"
-                android:textSize="52sp"
+                android:textSize="56sp"
                 android:textColor="@color/text_primary"
                 android:fontFamily="sans-serif-light"
                 android:layout_marginTop="4dp" />
@@ -409,10 +388,10 @@
                 android:id="@+id/schedProgressBar"
                 style="?android:attr/progressBarStyleHorizontal"
                 android:layout_width="match_parent"
-                android:layout_height="8dp"
-                android:layout_marginTop="8dp"
-                android:progressTint="@color/accent"
-                android:progressBackgroundTint="#2A2D40"
+                android:layout_height="10dp"
+                android:layout_marginTop="10dp"
+                android:progressTint="@color/accent_cyan"
+                android:progressBackgroundTint="#332A3360"
                 android:max="100" />
         </LinearLayout>
 
@@ -421,9 +400,11 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
+            android:layout_marginHorizontal="16dp"
+            android:layout_marginTop="12dp"
             android:paddingHorizontal="16dp"
-            android:paddingVertical="10dp"
-            android:background="@color/surface_dark">
+            android:paddingVertical="12dp"
+            android:background="@drawable/bg_surface_card">
 
             <TextView
                 android:id="@+id/schedTvTotalWalk"
@@ -432,7 +413,7 @@
                 android:layout_weight="1"
                 android:text="🚶 Walk: 0m"
                 android:textSize="13sp"
-                android:textColor="@color/text_secondary" />
+                android:textColor="@color/text_primary" />
 
             <TextView
                 android:id="@+id/schedTvTotalJog"
@@ -441,7 +422,7 @@
                 android:layout_weight="1"
                 android:text="🏃 Jog: 0m"
                 android:textSize="13sp"
-                android:textColor="@color/text_secondary"
+                android:textColor="@color/text_primary"
                 android:gravity="end" />
         </LinearLayout>
 
@@ -461,8 +442,8 @@
             android:layout_height="wrap_content"
             android:orientation="vertical"
             android:paddingHorizontal="16dp"
-            android:paddingTop="10dp"
-            android:paddingBottom="12dp"
+            android:paddingTop="12dp"
+            android:paddingBottom="14dp"
             android:background="@color/surface_dark">
 
             <!-- Add buttons -->
@@ -474,23 +455,23 @@
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/schedBtnAddWalk"
                     android:layout_width="0dp"
-                    android:layout_height="42dp"
+                    android:layout_height="44dp"
                     android:layout_weight="1"
                     android:layout_marginEnd="4dp"
                     android:text="+ Walk"
                     android:textSize="13sp"
-                    app:cornerRadius="21dp"
+                    app:cornerRadius="22dp"
                     android:backgroundTint="@color/color_walking" />
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/schedBtnAddJog"
                     android:layout_width="0dp"
-                    android:layout_height="42dp"
+                    android:layout_height="44dp"
                     android:layout_weight="1"
                     android:layout_marginStart="4dp"
                     android:text="+ Jog"
                     android:textSize="13sp"
-                    app:cornerRadius="21dp"
+                    app:cornerRadius="22dp"
                     android:backgroundTint="@color/color_running" />
             </LinearLayout>
 
@@ -504,26 +485,26 @@
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/schedBtnSave"
                     android:layout_width="0dp"
-                    android:layout_height="40dp"
+                    android:layout_height="42dp"
                     android:layout_weight="1"
                     android:layout_marginEnd="4dp"
                     android:text="💾 Save"
                     android:textSize="13sp"
-                    app:cornerRadius="20dp"
-                    android:backgroundTint="@color/surface_dark"
+                    app:cornerRadius="21dp"
+                    android:backgroundTint="@color/surface_elevated"
                     app:strokeColor="@color/accent"
                     app:strokeWidth="1dp" />
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/schedBtnLoad"
                     android:layout_width="0dp"
-                    android:layout_height="40dp"
+                    android:layout_height="42dp"
                     android:layout_weight="1"
                     android:layout_marginStart="4dp"
                     android:text="📂 Load"
                     android:textSize="13sp"
-                    app:cornerRadius="20dp"
-                    android:backgroundTint="@color/surface_dark"
+                    app:cornerRadius="21dp"
+                    android:backgroundTint="@color/surface_elevated"
                     app:strokeColor="@color/accent"
                     app:strokeWidth="1dp" />
             </LinearLayout>
@@ -535,16 +516,16 @@
                 android:gravity="center"
                 android:textSize="11sp"
                 android:textColor="@color/text_secondary"
-                android:layout_marginTop="6dp"
+                android:layout_marginTop="8dp"
                 android:layout_marginBottom="8dp" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/schedBtnStartStop"
                 android:layout_width="match_parent"
-                android:layout_height="50dp"
+                android:layout_height="52dp"
                 android:text="▶  Start"
                 android:textSize="16sp"
-                app:cornerRadius="25dp"
+                app:cornerRadius="26dp"
                 android:backgroundTint="@color/accent" />
         </LinearLayout>
 
@@ -564,17 +545,18 @@
             android:id="@+id/tvHistorySummary"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:padding="16dp"
+            android:layout_margin="16dp"
+            android:padding="18dp"
             android:textSize="13sp"
-            android:textColor="@color/text_secondary"
-            android:lineSpacingMultiplier="1.5"
-            android:background="@color/surface_dark" />
+            android:textColor="@color/text_primary"
+            android:lineSpacingMultiplier="1.6"
+            android:background="@drawable/bg_hero" />
 
         <TextView
             android:id="@+id/tvHistoryEmpty"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="No workouts recorded yet.
+            android:text="📊 No workouts recorded yet.
 Start a tracking session to build your history."
             android:gravity="center"
             android:paddingVertical="48dp"
@@ -589,7 +571,7 @@ Start a tracking session to build your history."
             android:layout_width="match_parent"
             android:layout_height="0dp"
             android:layout_weight="1"
-            android:paddingVertical="8dp"
+            android:paddingVertical="4dp"
             android:clipToPadding="false" />
 
         <TextView
@@ -599,8 +581,7 @@ Start a tracking session to build your history."
             android:gravity="center"
             android:textSize="11sp"
             android:textColor="@color/text_secondary"
-            android:paddingVertical="8dp"
-            android:background="@color/surface_dark" />
+            android:paddingVertical="10dp" />
 
     </LinearLayout>
 

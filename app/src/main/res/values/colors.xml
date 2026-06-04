@@ -1,35 +1,51 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Backgrounds -->
-    <color name="bg_dark">#0D0F1A</color>
-    <color name="surface_dark">#161929</color>
-    <color name="surface_elevated">#1E2237</color>
+    <!-- Backgrounds (deep navy, livelier than flat black) -->
+    <color name="bg_dark">#0B0E1A</color>
+    <color name="surface_dark">#151A2E</color>
+    <color name="surface_elevated">#1F2742</color>
+
+    <!-- App background gradient -->
+    <color name="grad_top">#13183A</color>
+    <color name="grad_bottom">#0A0C16</color>
 
     <!-- Text -->
-    <color name="text_primary">#EEF0FF</color>
-    <color name="text_secondary">#6B6F8E</color>
-    <color name="text_hint">#44475E</color>
+    <color name="text_primary">#F5F7FF</color>
+    <color name="text_secondary">#8A90B8</color>
+    <color name="text_hint">#565C82</color>
 
-    <!-- Accent (violet-blue) -->
-    <color name="accent">#6C70FF</color>
-    <color name="accent_dim">#22262880</color>
+    <!-- Accents -->
+    <color name="accent">#5C7CFA</color>
+    <color name="accent_2">#9B6BFF</color>
+    <color name="accent_cyan">#22D3EE</color>
+    <color name="accent_dim">#332A3360</color>
 
-    <!-- Activity colours — running=coral-orange, walking=emerald -->
-    <color name="color_running">#CCFF5722</color>
-    <color name="color_walking">#CC14B86A</color>
-    <color name="color_idle">#CC44475E</color>
+    <!-- Hero gradient (indigo → violet) -->
+    <color name="hero_grad_start">#3A2E7E</color>
+    <color name="hero_grad_mid">#2A2F66</color>
+    <color name="hero_grad_end">#151A2E</color>
 
-    <!-- Mini-stat cards on tracking tab -->
-    <color name="color_walking_card">#1C0D2318</color>
+    <!-- Activity colours — running = coral-orange, walking = emerald -->
+    <color name="color_running">#E0FF6B3D</color>
+    <color name="color_walking">#E014C28A</color>
+    <color name="color_idle">#CC555C82</color>
+
+    <!-- Walk stat-card gradient -->
+    <color name="walk_card_start">#1F1FB877</color>
+    <color name="walk_card_end">#0F0E3D28</color>
+    <!-- Run stat-card gradient -->
+    <color name="run_card_start">#26FF6B3D</color>
+    <color name="run_card_end">#120E2A18</color>
+
+    <!-- Legacy names kept for code/layout references -->
+    <color name="color_walking_card">#1C0F2318</color>
     <color name="color_running_card">#1C2A1000</color>
-
-    <!-- Schedule row tints -->
-    <color name="color_walking_dim">#150D2318</color>
+    <color name="color_walking_dim">#150F2318</color>
     <color name="color_running_dim">#152A1000</color>
-    <color name="color_active_period">#556C70FF</color>
-    <color name="color_done_period">#12FFFFFF</color>
+    <color name="color_active_period">#555C7CFA</color>
+    <color name="color_done_period">#14FFFFFF</color>
 
     <!-- Misc -->
-    <color name="icon_bg">#161929</color>
-    <color name="divider">#1AFFFFFF</color>
+    <color name="icon_bg">#151A2E</color>
+    <color name="divider">#1FFFFFFF</color>
 </resources>

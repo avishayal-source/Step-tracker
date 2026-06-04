@@ -4,8 +4,9 @@
         <item name="colorPrimary">@color/accent</item>
         <item name="colorPrimaryVariant">@color/surface_dark</item>
         <item name="colorOnPrimary">@color/text_primary</item>
-        <item name="android:windowBackground">@color/bg_dark</item>
-        <item name="android:statusBarColor">@color/surface_dark</item>
-        <item name="android:navigationBarColor">@color/bg_dark</item>
+        <item name="colorSecondary">@color/accent_2</item>
+        <item name="android:windowBackground">@drawable/bg_app_gradient</item>
+        <item name="android:statusBarColor">@color/grad_top</item>
+        <item name="android:navigationBarColor">@color/grad_bottom</item>
     </style>
 </resources>
