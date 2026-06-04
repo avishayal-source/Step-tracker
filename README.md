@@ -4,6 +4,12 @@ Android app for live step counting, walk/run classification, GPS distance, inter
 
 **Repository:** https://github.com/avishayal-source/Step-tracker.git
 
+## Screenshots
+
+| Tracking | Schedule | History |
+|:--------:|:--------:|:-------:|
+| <img src="Screenshots/tracking.jpeg" width="240" alt="Live tracking tab" /> | <img src="Screenshots/schedule.jpeg" width="240" alt="Interval schedule tab" /> | <img src="Screenshots/history.jpeg" width="240" alt="Workout history tab" /> |
+
 ## Features
 
 | Area | What it does |
