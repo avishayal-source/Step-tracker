@@ -51,6 +51,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var tvCurrentActivity: TextView
     private lateinit var tvTotalDist: TextView
     private lateinit var tvGpsIndicator: TextView
+    private lateinit var tvStepSizes: TextView
     private lateinit var tvWalkStats: TextView
     private lateinit var tvRunStats: TextView
     private lateinit var btnStartStop: MaterialButton
@@ -97,6 +98,7 @@ class MainActivity : AppCompatActivity() {
         tvCurrentActivity     = findViewById(R.id.tvCurrentActivity)
         tvTotalDist       = findViewById(R.id.tvTotalDist)
         tvGpsIndicator    = findViewById(R.id.tvGpsIndicator)
+        tvStepSizes       = findViewById(R.id.tvStepSizes)
         tvWalkStats       = findViewById(R.id.tvWalkStats)
         tvRunStats        = findViewById(R.id.tvRunStats)
         btnStartStop      = findViewById(R.id.btnStartStop)
@@ -238,7 +240,10 @@ class MainActivity : AppCompatActivity() {
         val totalDist = svc.walkDistM + svc.runDistM
         tvTotalDist.text = svc.formatDist(totalDist)
 
-        // Step length only shown in calibration screen, not here (#1)
+        val walkSizeStr = if (userPrefs.isCalibrated) "${"%.2f".format(userPrefs.walkStrideM)} m" else "-"
+        val runSizeStr  = if (userPrefs.isCalibrated) "${"%.2f".format(userPrefs.runStrideM)} m" else "-"
+        tvStepSizes.text = "Step size:  🚶 $walkSizeStr    🏃 $runSizeStr"
+
         tvWalkStats.text = "🚶 Walk\n${svc.walkSteps} steps\n${svc.formatDist(svc.walkDistM)}"
         tvRunStats.text  = "🏃 Run\n${svc.runSteps} steps\n${svc.formatDist(svc.runDistM)}"
 

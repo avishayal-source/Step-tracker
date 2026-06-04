@@ -101,6 +101,16 @@
                         android:layout_marginStart="8dp" />
                 </LinearLayout>
 
+                <!-- Step sizes -->
+                <TextView
+                    android:id="@+id/tvStepSizes"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text=""
+                    android:textSize="12sp"
+                    android:textColor="@color/text_secondary"
+                    android:layout_marginTop="6dp" />
+
                 <!-- Step counter -->
                 <TextView
                     android:id="@+id/tvStepCount"

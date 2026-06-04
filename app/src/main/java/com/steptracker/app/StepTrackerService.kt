@@ -32,20 +32,38 @@ class StepTrackerService : Service(), StepDetector.StepListener {
 
     // ── GPS ───────────────────────────────────────────────────────────────────
     private var locationManager: LocationManager? = null
-    private var lastLocation: Location? = null
+    // Only GPS_PROVIDER fixes are used for distance accumulation.
+    // Network/fused fixes can be hundreds of metres off and create phantom distance
+    // when GPS eventually acquires a real fix from a different position.
+    private var lastGpsLocation: Location? = null
     var gpsAvailable = false; private set
 
     private val locationListener = object : LocationListener {
         override fun onLocationChanged(loc: Location) {
-            if (loc.hasAccuracy() && loc.accuracy > 25f) return
-            lastLocation?.let { prev ->
-                val delta = prev.distanceTo(loc).toDouble()
-                if (delta in 0.5..150.0) {
-                    currentPeriod?.gpsDistanceM = (currentPeriod?.gpsDistanceM ?: 0.0) + delta
-                    recomputeTotals(); onUpdateListener?.invoke()
-                }
-            }
-            lastLocation = loc
+            // Only accumulate distance from GPS hardware fixes
+            if (loc.provider != LocationManager.GPS_PROVIDER) return
+
+            // Require good accuracy
+            if (loc.hasAccuracy() && loc.accuracy > 15f) return
+
+            gpsAvailable = true
+
+            val prev = lastGpsLocation
+            lastGpsLocation = loc
+
+            if (prev == null) return   // first fix — no reference point yet
+
+            val delta       = prev.distanceTo(loc).toDouble()
+            val timeDeltaSec = ((loc.time - prev.time) / 1000.0).coerceAtLeast(0.001)
+            val impliedSpeed = delta / timeDeltaSec   // m/s
+
+            // Sanity: reject fixes that imply > 29 km/h (GPS bounce / multipath)
+            if (impliedSpeed > 8.0) return
+            if (delta < 0.5 || delta > 200.0) return
+
+            currentPeriod?.gpsDistanceM = (currentPeriod?.gpsDistanceM ?: 0.0) + delta
+            recomputeTotals()
+            onUpdateListener?.invoke()
         }
         @Deprecated("Deprecated in Java")
         override fun onStatusChanged(p: String?, s: Int, e: Bundle?) {}
@@ -148,7 +166,7 @@ class StepTrackerService : Service(), StepDetector.StepListener {
         if (isTracking) return
         totalSteps = 0; walkSteps = 0; runSteps = 0
         walkDistM = 0.0; runDistM = 0.0; historySaved = false
-        activityPeriods.clear(); currentPeriod = null; lastLocation = null
+        activityPeriods.clear(); currentPeriod = null; lastGpsLocation = null
         onUpdateListener?.invoke()
     }
 
@@ -168,8 +186,6 @@ class StepTrackerService : Service(), StepDetector.StepListener {
         ))
     }
 
-    // ── GPS — FIX #2: request both coarse + fine; log status ─────────────────
-
     private fun startGps() {
         val lm = locationManager ?: return
         val hasFine = ActivityCompat.checkSelfPermission(
@@ -178,23 +194,22 @@ class StepTrackerService : Service(), StepDetector.StepListener {
             this, android.Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
         if (!hasFine && !hasCoarse) return
 
-        lastLocation = null
-        var registered = false
+        lastGpsLocation = null
+        gpsAvailable = false
 
-        // Try every available provider — GPS, fused (on most Samsungs), network
-        val providers = lm.getProviders(true)  // true = only enabled providers
+        // Register with all available providers so the OS can feed us GPS fixes.
+        // Distance accumulation only uses GPS_PROVIDER (see locationListener).
+        val providers = lm.getProviders(true)
+        var registered = false
         for (provider in providers) {
-            val needsFine = (provider == LocationManager.GPS_PROVIDER)
-            if (needsFine && !hasFine) continue
+            if (provider == LocationManager.GPS_PROVIDER && !hasFine) continue
+            if (provider != LocationManager.GPS_PROVIDER && !hasCoarse && !hasFine) continue
             try {
                 lm.requestLocationUpdates(provider, 1000L, 1f, locationListener, Looper.getMainLooper())
                 registered = true
             } catch (_: Exception) {}
         }
-
-        // Mark GPS as "available" once we are at least registered with some provider
-        // The indicator will update to confirmed 📍 once first fix arrives
-        gpsAvailable = registered && providers.isNotEmpty()
+        if (!registered) gpsAvailable = false
     }
 
     private fun stopGps() {

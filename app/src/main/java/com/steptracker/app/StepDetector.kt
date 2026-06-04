@@ -6,11 +6,19 @@ import android.hardware.SensorEventListener
 import kotlin.math.sqrt
 
 /**
- * Walk/run classifier — v5
+ * Walk/run classifier — v6 (cadence-only)
  *
- * - Cadence + magnitude hysteresis: different thresholds to enter vs leave running.
- * - Vote window still dampens jitter, but switches need fewer agreeing votes.
- * - Keeps partial vote history across transitions (no full cold reset).
+ * Previous versions mixed accelerometer magnitude into the classification.
+ * Magnitude is too sensitive to phone placement (pocket, hand, armband) and
+ * caused persistent mis-classification as running.
+ *
+ * This version uses cadence (steps per minute) only:
+ *   ≤ 128 SPM  → clearly walking  (500 ms+ per step)
+ *   ≥ 155 SPM  → clearly jogging  (387 ms per step)
+ *   128–155    → dead zone: stay in current state (hysteresis)
+ *
+ * A vote window of 10 steps requires a sustained cadence shift before
+ * the activity label changes (8 of 10 votes to enter run; 7 of 10 to exit).
  */
 class StepDetector(private val listener: StepListener) : SensorEventListener {
 
@@ -19,6 +27,7 @@ class StepDetector(private val listener: StepListener) : SensorEventListener {
         fun onActivityChanged(newActivity: ActivityType, wallTimeMs: Long)
     }
 
+    // ── Sensor timestamp → wall-clock conversion ──────────────────────────────
     private var offsetMs = 0L
     private var offsetInitialised = false
 
@@ -29,34 +38,36 @@ class StepDetector(private val listener: StepListener) : SensorEventListener {
         return offsetMs + bootNs / 1_000_000L
     }
 
+    // ── Gravity filter ────────────────────────────────────────────────────────
     private val GRAVITY_ALPHA = 0.80f
     private var gx = 0f; private var gy = 0f; private var gz = 9.81f
 
-    private val STEP_THRESHOLD = 1.5f
-    private val MIN_STEP_MS    = 230L
+    // ── Peak / step detection ─────────────────────────────────────────────────
+    private val STEP_THRESHOLD = 1.5f   // m/s² above gravity
+    private val MIN_STEP_MS    = 230L   // debounce: ~260 SPM max
     private var lastStepWallMs = 0L
     private var lastMag        = 0f
     private var rising         = false
-    private var currentPeakMag = 0f
 
-    private val WINDOW         = 8
-    private val MAG_WINDOW     = 6
-    private val stepIntervals  = ArrayDeque<Long>(WINDOW)
-    private val recentPeaks    = ArrayDeque<Float>(MAG_WINDOW)
+    // ── Cadence window ────────────────────────────────────────────────────────
+    private val INTERVAL_WINDOW = 10
+    private val stepIntervals   = ArrayDeque<Long>(INTERVAL_WINDOW)
 
-    // Enter run: higher bar. Exit run: lower bar (hysteresis).
-    private val RUN_ENTER_SPM  = 126
-    private val RUN_EXIT_SPM   = 112
-    private val RUN_ENTER_MAG  = 2.85f
-    private val RUN_EXIT_MAG   = 2.55f
+    // SPM thresholds — research-based
+    // Typical walking:   80–130 SPM   Typical jogging: 140–180 SPM
+    private val RUN_ENTER_SPM = 155   // ≥ this → running vote
+    private val RUN_EXIT_SPM  = 128   // ≤ this → walking vote
 
-    private val VOTE_WINDOW    = 8
-    private val VOTES_TO_RUN   = 5
-    private val VOTES_TO_WALK  = 4
-    private val classVotes     = ArrayDeque<ActivityType>(VOTE_WINDOW)
+    // ── Vote window ───────────────────────────────────────────────────────────
+    private val VOTE_WINDOW   = 10
+    private val VOTES_TO_RUN  = 8    // need 8/10 sustained to enter running
+    private val VOTES_TO_WALK = 7    // need 7/10 sustained to return to walking
+    private val classVotes    = ArrayDeque<ActivityType>(VOTE_WINDOW)
 
     var currentActivity = ActivityType.IDLE
         private set
+
+    // ── SensorEventListener ───────────────────────────────────────────────────
 
     override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
 
@@ -70,29 +81,27 @@ class StepDetector(private val listener: StepListener) : SensorEventListener {
         gz = GRAVITY_ALPHA * gz + (1 - GRAVITY_ALPHA) * az
 
         val mag = sqrt(((ax-gx)*(ax-gx) + (ay-gy)*(ay-gy) + (az-gz)*(az-gz)).toDouble()).toFloat()
-        if (mag > currentPeakMag) currentPeakMag = mag
-
         detectStep(mag, wallMs)
         lastMag = mag
     }
 
+    // ── Step detection ────────────────────────────────────────────────────────
+
     private fun detectStep(mag: Float, wallMs: Long) {
-        if (mag > lastMag) { rising = true }
-        else if (rising && lastMag > STEP_THRESHOLD) {
+        if (mag > lastMag) {
+            rising = true
+        } else if (rising && lastMag > STEP_THRESHOLD) {
             rising = false
             val gap = wallMs - lastStepWallMs
-            if (gap >= MIN_STEP_MS) {
-                if (recentPeaks.size >= MAG_WINDOW) recentPeaks.removeFirst()
-                recentPeaks.addLast(currentPeakMag)
-                currentPeakMag = 0f
-                registerStep(wallMs, gap)
-            }
-        } else { rising = false }
+            if (gap >= MIN_STEP_MS) registerStep(wallMs, gap)
+        } else {
+            rising = false
+        }
     }
 
     private fun registerStep(wallMs: Long, intervalMs: Long) {
         lastStepWallMs = wallMs
-        if (stepIntervals.size >= WINDOW) stepIntervals.removeFirst()
+        if (stepIntervals.size >= INTERVAL_WINDOW) stepIntervals.removeFirst()
         stepIntervals.addLast(intervalMs)
 
         val vote = classify()
@@ -102,55 +111,50 @@ class StepDetector(private val listener: StepListener) : SensorEventListener {
         val runVotes  = classVotes.count { it == ActivityType.RUNNING }
         val walkVotes = classVotes.count { it == ActivityType.WALKING }
 
-        // Bootstrap from idle after a few steps
-        if (currentActivity == ActivityType.IDLE && classVotes.size >= 3) {
+        // Bootstrap: resolve IDLE once we have enough steps to judge cadence
+        if (currentActivity == ActivityType.IDLE && classVotes.size >= 5) {
             currentActivity = if (runVotes > walkVotes) ActivityType.RUNNING else ActivityType.WALKING
             listener.onActivityChanged(currentActivity, wallMs)
         }
 
         val newActivity = when (currentActivity) {
-            ActivityType.WALKING ->
-                if (runVotes >= VOTES_TO_RUN) ActivityType.RUNNING else ActivityType.WALKING
-            ActivityType.RUNNING ->
-                if (walkVotes >= VOTES_TO_WALK) ActivityType.WALKING else ActivityType.RUNNING
-            ActivityType.IDLE -> currentActivity
+            ActivityType.WALKING -> if (runVotes  >= VOTES_TO_RUN)  ActivityType.RUNNING else ActivityType.WALKING
+            ActivityType.RUNNING -> if (walkVotes >= VOTES_TO_WALK) ActivityType.WALKING else ActivityType.RUNNING
+            ActivityType.IDLE    -> currentActivity
         }
 
         if (newActivity != currentActivity && newActivity != ActivityType.IDLE) {
             currentActivity = newActivity
-            // Keep recent cadence/magnitude context; only trim a little of the vote buffer
-            repeat(2) { if (classVotes.isNotEmpty()) classVotes.removeFirst() }
+            classVotes.clear()   // flush votes after a switch — require fresh evidence
             listener.onActivityChanged(currentActivity, wallMs)
         }
 
         listener.onStep(wallMs, currentActivity)
     }
 
+    // ── Cadence classifier (cadence-only, placement-independent) ─────────────
+
     private fun classify(): ActivityType {
-        if (stepIntervals.isEmpty()) return ActivityType.WALKING
+        if (stepIntervals.size < 3) return ActivityType.WALKING
         val sorted   = stepIntervals.sorted()
         val medianMs = sorted[sorted.size / 2].toDouble()
         val spm      = (60_000.0 / medianMs).toInt()
-        val rmsMag   = if (recentPeaks.isNotEmpty())
-            sqrt(recentPeaks.sumOf { (it * it).toDouble() } / recentPeaks.size).toFloat()
-        else 0f
-
-        val inRun = currentActivity == ActivityType.RUNNING
-        val runSpmThresh = if (inRun) RUN_EXIT_SPM else RUN_ENTER_SPM
-        val runMagThresh = if (inRun) RUN_EXIT_MAG else RUN_ENTER_MAG
 
         return when {
-            spm >= runSpmThresh && rmsMag >= runMagThresh -> ActivityType.RUNNING
-            spm < runSpmThresh - 8 || rmsMag < runMagThresh - 0.35f -> ActivityType.WALKING
-            inRun -> ActivityType.RUNNING
-            else  -> ActivityType.WALKING
+            spm >= RUN_ENTER_SPM -> ActivityType.RUNNING
+            spm <= RUN_EXIT_SPM  -> ActivityType.WALKING
+            // Dead zone: maintain current state
+            currentActivity == ActivityType.RUNNING -> ActivityType.RUNNING
+            else -> ActivityType.WALKING
         }
     }
 
+    // ── Reset ─────────────────────────────────────────────────────────────────
+
     fun reset(seedActivity: ActivityType = ActivityType.IDLE) {
-        stepIntervals.clear(); recentPeaks.clear(); classVotes.clear()
+        stepIntervals.clear(); classVotes.clear()
         currentActivity = seedActivity
-        lastStepWallMs  = 0L; lastMag = 0f; rising = false; currentPeakMag = 0f
+        lastStepWallMs = 0L; lastMag = 0f; rising = false
         offsetInitialised = false
     }
 }
