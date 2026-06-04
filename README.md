@@ -6,9 +6,9 @@ Android app for live step counting, walk/run classification, GPS distance, inter
 
 ## Screenshots
 
-| Tracking | Schedule | History |
-|:--------:|:--------:|:-------:|
-| <img src="Screenshots/tracking.jpeg" width="240" alt="Live tracking tab" /> | <img src="Screenshots/schedule.jpeg" width="240" alt="Interval schedule tab" /> | <img src="Screenshots/history.jpeg" width="240" alt="Workout history tab" /> |
+| Tracking | Schedule | History + Insights |
+|:--------:|:--------:|:------------------:|
+| <img src="Screenshots/tracking.jpeg" width="240" alt="Live tracking tab" /> | <img src="Screenshots/schedule.jpeg" width="240" alt="Interval schedule tab" /> | <img src="Screenshots/history.jpeg" width="240" alt="Workout history with auto-generated insights" /> |
 
 ## Features
 
@@ -18,7 +18,8 @@ Android app for live step counting, walk/run classification, GPS distance, inter
 | **Distance** | Uses calibrated stride length per activity; GPS augments distance when location permission is granted. |
 | **Calibration** | Wizard measures walk/jog stride length (sensor + optional GPS) and stores values in `UserPrefs`. |
 | **Schedules** | Build timed intervals (walk/jog/rest); 3-2-1 prep countdown, period timers, audio cues, persistence across rotation. |
-| **History** | Completed sessions saved to `WorkoutHistory` (steps, distance, duration per activity type). |
+| **History** | Completed sessions persisted in a **Room (SQLite)** database (steps, distance, duration per activity type). |
+| **Insights** | Auto-generated summary at the top of History: last-7-day activity, running pace vs your 4-week average, day streak, 30-day frequency, and longest-session personal best. |
 
 ## Requirements
 
