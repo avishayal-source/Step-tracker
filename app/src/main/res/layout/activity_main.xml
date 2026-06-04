@@ -62,231 +62,286 @@
             android:orientation="vertical"
             android:paddingBottom="32dp">
 
-            <!-- Hero card -->
+            <!-- ── Hero card ─────────────────────────────────────────────── -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
                 android:gravity="center"
-                android:paddingTop="20dp"
-                android:paddingBottom="16dp"
-                android:paddingHorizontal="20dp"
                 android:background="@color/surface_dark">
 
-                <!-- Row: activity pill + GPS badge -->
-                <LinearLayout
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:gravity="center_vertical">
+                <!-- Accent top bar -->
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="3dp"
+                    android:background="@color/accent" />
 
-                    <TextView
-                        android:id="@+id/tvCurrentActivity"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Not tracking"
-                        android:textSize="15sp"
-                        android:textColor="@color/text_primary"
-                        android:background="@drawable/pill_background"
-                        android:paddingHorizontal="16dp"
-                        android:paddingVertical="5dp" />
-
-                    <TextView
-                        android:id="@+id/tvGpsIndicator"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text=""
-                        android:textSize="12sp"
-                        android:textColor="@color/accent"
-                        android:layout_marginStart="8dp" />
-                </LinearLayout>
-
-                <!-- Step sizes -->
-                <TextView
-                    android:id="@+id/tvStepSizes"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text=""
-                    android:textSize="12sp"
-                    android:textColor="@color/text_secondary"
-                    android:layout_marginTop="6dp" />
-
-                <!-- Step counter -->
-                <TextView
-                    android:id="@+id/tvStepCount"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="0"
-                    android:textSize="48sp"
-                    android:textColor="@color/text_primary"
-                    android:fontFamily="sans-serif-light"
-                    android:layout_marginTop="4dp" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="steps"
-                    android:textSize="13sp"
-                    android:textColor="@color/text_secondary"
-                    android:layout_marginTop="-6dp" />
-
-                <TextView
-                    android:id="@+id/tvSessionElapsed"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="00:00"
-                    android:textSize="22sp"
-                    android:textColor="@color/text_primary"
-                    android:fontFamily="sans-serif-light"
-                    android:layout_marginTop="6dp"
-                    android:visibility="gone" />
-
-                <TextView
-                    android:id="@+id/tvSessionElapsedLabel"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="session time"
-                    android:textSize="11sp"
-                    android:textColor="@color/text_secondary"
-                    android:visibility="gone" />
-
-                <!-- Total distance -->
-                <TextView
-                    android:id="@+id/tvTotalDist"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="0 m"
-                    android:textSize="36sp"
-                    android:textColor="@color/accent"
-                    android:layout_marginTop="8dp" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="total distance"
-                    android:textSize="11sp"
-                    android:textColor="@color/text_secondary" />
-
-                <!-- Walk / Run split -->
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:layout_marginTop="14dp">
+                    android:orientation="vertical"
+                    android:gravity="center"
+                    android:paddingTop="18dp"
+                    android:paddingBottom="16dp"
+                    android:paddingHorizontal="20dp">
 
-                    <androidx.cardview.widget.CardView
-                        android:layout_width="0dp"
+                    <!-- Activity pill + GPS -->
+                    <LinearLayout
+                        android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:layout_marginEnd="5dp"
-                        app:cardBackgroundColor="@color/color_walking_card"
-                        app:cardCornerRadius="12dp"
-                        app:cardElevation="0dp">
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical">
+
                         <TextView
-                            android:id="@+id/tvWalkStats"
+                            android:id="@+id/tvCurrentActivity"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="🚶 Walk\n0 steps\n0 m"
+                            android:text="Not tracking"
+                            android:textSize="14sp"
                             android:textColor="@color/text_primary"
-                            android:textSize="13sp"
-                            android:lineSpacingMultiplier="1.4"
-                            android:padding="12dp" />
-                    </androidx.cardview.widget.CardView>
+                            android:background="@drawable/pill_background"
+                            android:paddingHorizontal="16dp"
+                            android:paddingVertical="5dp" />
 
-                    <androidx.cardview.widget.CardView
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content"
-                        android:layout_weight="1"
-                        android:layout_marginStart="5dp"
-                        app:cardBackgroundColor="@color/color_running_card"
-                        app:cardCornerRadius="12dp"
-                        app:cardElevation="0dp">
                         <TextView
-                            android:id="@+id/tvRunStats"
+                            android:id="@+id/tvGpsIndicator"
                             android:layout_width="wrap_content"
                             android:layout_height="wrap_content"
-                            android:text="🏃 Run\n0 steps\n0 m"
-                            android:textColor="@color/text_primary"
-                            android:textSize="13sp"
-                            android:lineSpacingMultiplier="1.4"
-                            android:padding="12dp" />
-                    </androidx.cardview.widget.CardView>
-                </LinearLayout>
+                            android:text=""
+                            android:textSize="11sp"
+                            android:textColor="@color/accent"
+                            android:layout_marginStart="10dp" />
+                    </LinearLayout>
 
-                <!-- Buttons row -->
-                <LinearLayout
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:layout_marginTop="16dp">
+                    <!-- Step sizes (calibrated) -->
+                    <TextView
+                        android:id="@+id/tvStepSizes"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text=""
+                        android:textSize="11sp"
+                        android:textColor="@color/text_secondary"
+                        android:layout_marginTop="6dp" />
 
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/btnStartStop"
-                        android:layout_width="130dp"
-                        android:layout_height="48dp"
-                        android:text="▶  Start"
-                        android:textSize="15sp"
-                        app:cornerRadius="24dp"
-                        android:backgroundTint="@color/accent" />
+                    <!-- Step count -->
+                    <TextView
+                        android:id="@+id/tvStepCount"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="0"
+                        android:textSize="56sp"
+                        android:textColor="@color/text_primary"
+                        android:fontFamily="sans-serif-thin"
+                        android:layout_marginTop="6dp" />
 
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/btnReset"
-                        android:layout_width="90dp"
-                        android:layout_height="48dp"
-                        android:text="↺ Reset"
-                        android:textSize="12sp"
-                        android:layout_marginStart="8dp"
-                        app:cornerRadius="24dp"
-                        android:backgroundTint="@color/surface_dark"
-                        app:strokeColor="@color/text_secondary"
-                        app:strokeWidth="1dp"
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="STEPS"
+                        android:textSize="10sp"
+                        android:letterSpacing="0.2"
+                        android:textColor="@color/text_secondary"
+                        android:layout_marginTop="-8dp" />
+
+                    <!-- Session time -->
+                    <TextView
+                        android:id="@+id/tvSessionElapsed"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="00:00"
+                        android:textSize="20sp"
+                        android:textColor="@color/text_primary"
+                        android:fontFamily="sans-serif-light"
+                        android:layout_marginTop="8dp"
                         android:visibility="gone" />
 
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/btnCalibrate"
+                    <TextView
+                        android:id="@+id/tvSessionElapsedLabel"
                         android:layout_width="wrap_content"
-                        android:layout_height="48dp"
-                        android:text="⚙ Calibrate"
-                        android:textSize="12sp"
-                        android:layout_marginStart="8dp"
-                        app:cornerRadius="24dp"
-                        android:backgroundTint="@color/surface_dark"
-                        app:strokeColor="@color/accent"
-                        app:strokeWidth="1dp" />
-                </LinearLayout>
+                        android:layout_height="wrap_content"
+                        android:text="SESSION TIME"
+                        android:textSize="9sp"
+                        android:letterSpacing="0.15"
+                        android:textColor="@color/text_secondary"
+                        android:visibility="gone" />
 
+                    <!-- Total distance -->
+                    <TextView
+                        android:id="@+id/tvTotalDist"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="0 m"
+                        android:textSize="34sp"
+                        android:textColor="@color/accent"
+                        android:layout_marginTop="10dp" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="TOTAL DISTANCE"
+                        android:textSize="9sp"
+                        android:letterSpacing="0.15"
+                        android:textColor="@color/text_secondary"
+                        android:layout_marginTop="-4dp" />
+
+                    <!-- Thin divider -->
+                    <View
+                        android:layout_width="48dp"
+                        android:layout_height="1dp"
+                        android:background="@color/divider"
+                        android:layout_marginVertical="12dp" />
+
+                    <!-- Walk / Run split cards -->
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal">
+
+                        <androidx.cardview.widget.CardView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:layout_marginEnd="5dp"
+                            app:cardBackgroundColor="@color/color_walking_card"
+                            app:cardCornerRadius="14dp"
+                            app:cardElevation="0dp">
+                            <TextView
+                                android:id="@+id/tvWalkStats"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="🚶 Walk\n0 steps\n0 m"
+                                android:textColor="@color/text_primary"
+                                android:textSize="13sp"
+                                android:lineSpacingMultiplier="1.5"
+                                android:padding="14dp" />
+                        </androidx.cardview.widget.CardView>
+
+                        <androidx.cardview.widget.CardView
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:layout_marginStart="5dp"
+                            app:cardBackgroundColor="@color/color_running_card"
+                            app:cardCornerRadius="14dp"
+                            app:cardElevation="0dp">
+                            <TextView
+                                android:id="@+id/tvRunStats"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="🏃 Run\n0 steps\n0 m"
+                                android:textColor="@color/text_primary"
+                                android:textSize="13sp"
+                                android:lineSpacingMultiplier="1.5"
+                                android:padding="14dp" />
+                        </androidx.cardview.widget.CardView>
+                    </LinearLayout>
+
+                    <!-- Buttons -->
+                    <LinearLayout
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:layout_marginTop="16dp">
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnStartStop"
+                            android:layout_width="136dp"
+                            android:layout_height="50dp"
+                            android:text="▶  Start"
+                            android:textSize="15sp"
+                            android:letterSpacing="0.03"
+                            app:cornerRadius="25dp"
+                            android:backgroundTint="@color/accent" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnReset"
+                            android:layout_width="90dp"
+                            android:layout_height="50dp"
+                            android:text="↺  Reset"
+                            android:textSize="12sp"
+                            android:layout_marginStart="8dp"
+                            app:cornerRadius="25dp"
+                            android:backgroundTint="@color/bg_dark"
+                            app:strokeColor="@color/text_hint"
+                            app:strokeWidth="1dp"
+                            android:visibility="gone" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnCalibrate"
+                            android:layout_width="wrap_content"
+                            android:layout_height="50dp"
+                            android:text="⚙  Calibrate"
+                            android:textSize="12sp"
+                            android:layout_marginStart="8dp"
+                            app:cornerRadius="25dp"
+                            android:backgroundTint="@color/bg_dark"
+                            app:strokeColor="@color/accent"
+                            app:strokeWidth="1dp" />
+                    </LinearLayout>
+
+                </LinearLayout>
             </LinearLayout>
 
-            <!-- Log header row -->
+            <!-- ── Debug metrics card ─────────────────────────────────── -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center_vertical"
-                android:paddingHorizontal="20dp"
-                android:paddingTop="18dp"
+                android:orientation="vertical"
+                android:paddingHorizontal="16dp"
+                android:paddingTop="14dp"
                 android:paddingBottom="4dp">
 
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="ACTIVITY LOG"
+                    android:text="DEBUG"
+                    android:textSize="10sp"
+                    android:letterSpacing="0.15"
+                    android:textColor="@color/text_hint"
+                    android:fontFamily="sans-serif-medium"
+                    android:paddingBottom="4dp" />
+
+                <TextView
+                    android:id="@+id/tvDebugInfo"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="—"
                     android:textSize="11sp"
+                    android:textColor="@color/text_secondary"
+                    android:fontFamily="monospace"
+                    android:lineSpacingMultiplier="1.5"
+                    android:background="@color/surface_dark"
+                    android:padding="10dp" />
+            </LinearLayout>
+
+            <!-- ── Activity log ───────────────────────────────────────── -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:paddingHorizontal="16dp"
+                android:paddingTop="14dp"
+                android:paddingBottom="4dp">
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="ACTIVITY LOG"
+                    android:textSize="10sp"
                     android:letterSpacing="0.15"
                     android:textColor="@color/text_secondary"
                     android:fontFamily="sans-serif-medium" />
-            </LinearLayout>
 
-            <!-- Log totals -->
-            <TextView
-                android:id="@+id/tvLogTotals"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:paddingHorizontal="20dp"
-                android:paddingBottom="8dp"
-                android:textSize="12sp"
-                android:textColor="@color/accent"
-                android:visibility="gone" />
+                <TextView
+                    android:id="@+id/tvLogTotals"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textSize="11sp"
+                    android:textColor="@color/accent"
+                    android:visibility="gone" />
+            </LinearLayout>
 
             <!-- Empty hint -->
             <TextView
@@ -296,8 +351,9 @@
                 android:text="Start tracking to see your activity log here"
                 android:gravity="center"
                 android:paddingVertical="24dp"
+                android:paddingHorizontal="24dp"
                 android:textColor="@color/text_secondary"
-                android:textSize="14sp" />
+                android:textSize="13sp" />
 
             <!-- Log list -->
             <androidx.recyclerview.widget.RecyclerView

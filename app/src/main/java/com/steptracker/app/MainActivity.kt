@@ -3,6 +3,7 @@ package com.steptracker.app
 import android.Manifest
 import android.content.*
 import android.content.pm.PackageManager
+import android.content.res.ColorStateList
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
@@ -52,6 +53,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var tvTotalDist: TextView
     private lateinit var tvGpsIndicator: TextView
     private lateinit var tvStepSizes: TextView
+    private lateinit var tvDebugInfo: TextView
     private lateinit var tvWalkStats: TextView
     private lateinit var tvRunStats: TextView
     private lateinit var btnStartStop: MaterialButton
@@ -99,6 +101,7 @@ class MainActivity : AppCompatActivity() {
         tvTotalDist       = findViewById(R.id.tvTotalDist)
         tvGpsIndicator    = findViewById(R.id.tvGpsIndicator)
         tvStepSizes       = findViewById(R.id.tvStepSizes)
+        tvDebugInfo       = findViewById(R.id.tvDebugInfo)
         tvWalkStats       = findViewById(R.id.tvWalkStats)
         tvRunStats        = findViewById(R.id.tvRunStats)
         btnStartStop      = findViewById(R.id.btnStartStop)
@@ -215,41 +218,57 @@ class MainActivity : AppCompatActivity() {
     private fun updateTrackingUI() {
         val svc = service ?: return
 
+        // ── Step count + timer ────────────────────────────────────────────────
         tvStepCount.text = svc.totalSteps.toString()
         val showElapsed = svc.isTracking
         tvSessionElapsed.text = if (showElapsed) formatElapsed(svc.sessionElapsedMs()) else "00:00"
-        tvSessionElapsed.visibility = if (showElapsed) View.VISIBLE else View.GONE
+        tvSessionElapsed.visibility      = if (showElapsed) View.VISIBLE else View.GONE
         tvSessionElapsedLabel.visibility = if (showElapsed) View.VISIBLE else View.GONE
+
+        // ── Activity pill with dynamic colour ─────────────────────────────────
+        val activityType = svc.currentPeriod?.type
         tvCurrentActivity.text = when {
-            !svc.isTracking -> "Not tracking"
-            else -> when (svc.currentPeriod?.type) {
-                ActivityType.RUNNING -> "🏃 Running / Jogging"
-                ActivityType.WALKING -> "🚶 Walking"
-                else -> "⏸ Idle"
-            }
+            !svc.isTracking        -> "Not tracking"
+            activityType == ActivityType.RUNNING -> "🏃 Running / Jogging"
+            activityType == ActivityType.WALKING -> "🚶 Walking"
+            else                   -> "⏸ Idle"
         }
+        val pillColor = when {
+            !svc.isTracking        -> ContextCompat.getColor(this, R.color.surface_elevated)
+            activityType == ActivityType.RUNNING -> 0xBFFF5722.toInt()   // coral-orange
+            activityType == ActivityType.WALKING -> 0xBF14B86A.toInt()   // emerald
+            else                   -> ContextCompat.getColor(this, R.color.surface_elevated)
+        }
+        tvCurrentActivity.backgroundTintList = ColorStateList.valueOf(pillColor)
+
+        // ── GPS indicator ─────────────────────────────────────────────────────
         val hasFineLocation = ContextCompat.checkSelfPermission(
             this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
         tvGpsIndicator.text = when {
-            !svc.isTracking    -> ""
-            !hasFineLocation   -> "⚠ No GPS permission"
-            svc.gpsAvailable   -> "📍 GPS"
-            else               -> "👟 Steps (GPS acquiring…)"
+            !svc.isTracking  -> ""
+            !hasFineLocation -> "⚠ No GPS"
+            svc.gpsAvailable -> "📍 GPS active"
+            else             -> "⌛ GPS acquiring…"
         }
 
-        val totalDist = svc.walkDistM + svc.runDistM
-        tvTotalDist.text = svc.formatDist(totalDist)
+        // ── Distance + step sizes ─────────────────────────────────────────────
+        tvTotalDist.text = svc.formatDist(svc.walkDistM + svc.runDistM)
 
-        val walkSizeStr = if (userPrefs.isCalibrated) "${"%.2f".format(userPrefs.walkStrideM)} m" else "-"
-        val runSizeStr  = if (userPrefs.isCalibrated) "${"%.2f".format(userPrefs.runStrideM)} m" else "-"
-        tvStepSizes.text = "Step size:  🚶 $walkSizeStr    🏃 $runSizeStr"
+        val walkSizeStr = if (userPrefs.isCalibrated) "${"%.2f".format(userPrefs.walkStrideM)} m" else "–"
+        val runSizeStr  = if (userPrefs.isCalibrated) "${"%.2f".format(userPrefs.runStrideM)} m" else "–"
+        tvStepSizes.text = "Step:  🚶 $walkSizeStr   🏃 $runSizeStr"
 
         tvWalkStats.text = "🚶 Walk\n${svc.walkSteps} steps\n${svc.formatDist(svc.walkDistM)}"
         tvRunStats.text  = "🏃 Run\n${svc.runSteps} steps\n${svc.formatDist(svc.runDistM)}"
 
+        // ── Debug metrics ─────────────────────────────────────────────────────
+        tvDebugInfo.text = if (svc.isTracking) svc.debugInfo() else "—  (start tracking to see metrics)"
+
+        // ── Buttons ───────────────────────────────────────────────────────────
         btnStartStop.text = if (svc.isTracking) "■  Stop" else "▶  Start"
         btnReset.visibility = if (!svc.isTracking && svc.totalSteps > 0) View.VISIBLE else View.GONE
 
+        // ── Activity log ──────────────────────────────────────────────────────
         val filtered = svc.activityPeriods.filter { it.type != ActivityType.IDLE }
         adapter.updateData(filtered)
         tvEmptyHint.visibility = if (filtered.isEmpty()) View.VISIBLE else View.GONE
@@ -258,10 +277,12 @@ class MainActivity : AppCompatActivity() {
             val walkMs = filtered.filter { it.type == ActivityType.WALKING }.sumOf { it.durationMs }
             val runMs  = filtered.filter { it.type == ActivityType.RUNNING  }.sumOf { it.durationMs }
             tvLogTotals.text =
-                "🚶 ${TimeUnit.MILLISECONDS.toMinutes(walkMs)}m · ${svc.formatDist(svc.walkDistM)}   " +
-                "🏃 ${TimeUnit.MILLISECONDS.toMinutes(runMs)}m · ${svc.formatDist(svc.runDistM)}"
+                "🚶 ${TimeUnit.MILLISECONDS.toMinutes(walkMs)}m  ${svc.formatDist(svc.walkDistM)}   " +
+                "🏃 ${TimeUnit.MILLISECONDS.toMinutes(runMs)}m  ${svc.formatDist(svc.runDistM)}"
             tvLogTotals.visibility = View.VISIBLE
-        } else tvLogTotals.visibility = View.GONE
+        } else {
+            tvLogTotals.visibility = View.GONE
+        }
     }
 
     // ── History UI ────────────────────────────────────────────────────────────

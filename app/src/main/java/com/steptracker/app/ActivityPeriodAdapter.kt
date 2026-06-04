@@ -17,6 +17,7 @@ class ActivityPeriodAdapter(private val periods: MutableList<ActivityPeriod>) :
 
     inner class PeriodViewHolder(view: View) : RecyclerView.ViewHolder(view) {
         val card: CardView       = view.findViewById(R.id.card)
+        val viewBar: View        = view.findViewById(R.id.viewTypeBar)
         val tvType: TextView     = view.findViewById(R.id.tvActivityType)
         val tvStart: TextView    = view.findViewById(R.id.tvStartTime)
         val tvEnd: TextView      = view.findViewById(R.id.tvEndTime)
@@ -37,23 +38,28 @@ class ActivityPeriodAdapter(private val periods: MutableList<ActivityPeriod>) :
             ActivityType.RUNNING -> {
                 holder.tvType.text = "🏃 Running / Jogging"
                 holder.card.setCardBackgroundColor(ctx.getColor(R.color.color_running))
+                holder.viewBar.setBackgroundColor(0xFFFF5722.toInt())
             }
             ActivityType.WALKING -> {
                 holder.tvType.text = "🚶 Walking"
                 holder.card.setCardBackgroundColor(ctx.getColor(R.color.color_walking))
+                holder.viewBar.setBackgroundColor(0xFF14B86A.toInt())
             }
             ActivityType.IDLE -> {
                 holder.tvType.text = "⏸ Idle"
                 holder.card.setCardBackgroundColor(ctx.getColor(R.color.color_idle))
+                holder.viewBar.setBackgroundColor(0xFF44475E.toInt())
             }
         }
 
-        holder.tvStart.text    = "Start: ${timeFmt.format(Date(period.startTime))}"
-        holder.tvEnd.text      = if (period.endTime > 0) "End:   ${timeFmt.format(Date(period.endTime))}"
-                                  else "End:   ongoing…"
-        holder.tvDuration.text = "Duration: ${formatDuration(period.durationMs)}"
-        holder.tvSteps.text    = "Steps: ${period.steps}"
-        holder.tvDist.text     = "Dist:  ${formatDist(period.distanceMeters)}"
+        holder.tvStart.text    = timeFmt.format(Date(period.startTime))
+        holder.tvEnd.text      = if (period.endTime > 0) "→ ${timeFmt.format(Date(period.endTime))}"
+                                  else "→ ongoing…"
+        holder.tvDuration.text = formatDuration(period.durationMs)
+        holder.tvSteps.text    = "${period.steps} steps"
+        val distLabel = if (period.usingGps) "📍 ${formatDist(period.distanceMeters)}"
+                        else "👟 ${formatDist(period.distanceMeters)}"
+        holder.tvDist.text = distLabel
     }
 
     override fun getItemCount() = periods.size

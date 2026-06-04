@@ -256,13 +256,26 @@ class StepTrackerService : Service(), StepDetector.StepListener {
     }
 
     private fun recomputeTotals() {
+        // NOTE: currentPeriod is already inside activityPeriods (added in openNewPeriod).
+        // Do NOT add listOfNotNull(currentPeriod) — that was double-counting the live
+        // period the entire session, causing the displayed distance to be ~2× too high.
         walkSteps = 0; runSteps = 0; walkDistM = 0.0; runDistM = 0.0
-        val all = activityPeriods + listOfNotNull(currentPeriod)
-        for (p in all) when (p.type) {
+        for (p in activityPeriods) when (p.type) {
             ActivityType.WALKING -> { walkSteps += p.steps; walkDistM += p.distanceMeters }
             ActivityType.RUNNING -> { runSteps  += p.steps; runDistM  += p.distanceMeters }
             else -> {}
         }
+    }
+
+    fun debugInfo(): String {
+        val det = stepDetector
+        val strideM = if (det.currentActivity == ActivityType.RUNNING) userPrefs.runStrideM
+                      else userPrefs.walkStrideM
+        val stepsPerTenM = if (strideM > 0) (10.0 / strideM).toInt() else 0
+        return "SPM: ${det.currentSpm}  interval: ${det.lastIntervalMs}ms  " +
+               "steps/10m: ~$stepsPerTenM\n" +
+               "Votes → run: ${det.runVoteCount}  walk: ${det.walkVoteCount}  " +
+               "window: ${det.totalVoteCount}/10  state: ${det.currentActivity}"
     }
 
     private fun buildStatusText(): String {
