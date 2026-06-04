@@ -312,11 +312,7 @@ class MainActivity : AppCompatActivity() {
             // Long-press → delete confirmation
             AlertDialog.Builder(this).setTitle("Delete this workout?")
                 .setPositiveButton("Delete") { _, _ ->
-                    // Rebuild history without this record
-                    val all = workoutHistory.loadAll().toMutableList()
-                    all.removeAll { it.id == record.id }
-                    workoutHistory.clearAll()
-                    all.forEach { workoutHistory.save(it) }
+                    workoutHistory.delete(record.id)
                     updateHistoryUI()
                 }.setNegativeButton("Cancel", null).show()
         }
