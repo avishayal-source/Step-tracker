@@ -65,6 +65,7 @@ class MainActivity : AppCompatActivity() {
 
     // History
     private lateinit var tvHistorySummary: TextView
+    private lateinit var tvHistoryInsights: TextView
     private lateinit var rvHistory: RecyclerView
     private lateinit var tvHistoryEmpty: TextView
 
@@ -113,6 +114,7 @@ class MainActivity : AppCompatActivity() {
 
         // History views
         tvHistorySummary  = findViewById(R.id.tvHistorySummary)
+        tvHistoryInsights = findViewById(R.id.tvHistoryInsights)
         rvHistory         = findViewById(R.id.rvHistory)
         tvHistoryEmpty    = findViewById(R.id.tvHistoryEmpty)
 
@@ -295,6 +297,7 @@ class MainActivity : AppCompatActivity() {
 
         if (records.isEmpty()) {
             tvHistorySummary.text = "No workouts yet"
+            tvHistoryInsights.visibility = View.GONE
             return
         }
 
@@ -307,6 +310,15 @@ class MainActivity : AppCompatActivity() {
             "ALL TIME  ·  ${records.size} workouts\n" +
             "🚶 ${formatDist(totalWalkDist)}  ${formatDur(totalWalkMs)}\n" +
             "🏃 ${formatDist(totalRunDist)}  ${formatDur(totalRunMs)}"
+
+        // Auto-generated insights (#A): pace trend, streak, frequency, PBs.
+        val insights = WorkoutInsights.compute(records)
+        if (insights.isEmpty()) {
+            tvHistoryInsights.visibility = View.GONE
+        } else {
+            tvHistoryInsights.visibility = View.VISIBLE
+            tvHistoryInsights.text = "✨ INSIGHTS\n\n" + insights.joinToString("\n")
+        }
 
         rvHistory.adapter = HistoryAdapter(records) { record ->
             // Long-press → delete confirmation

@@ -552,6 +552,20 @@
             android:lineSpacingMultiplier="1.6"
             android:background="@drawable/bg_hero" />
 
+        <!-- Auto-generated insights (pace trend, streak, frequency, PBs) -->
+        <TextView
+            android:id="@+id/tvHistoryInsights"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginHorizontal="16dp"
+            android:layout_marginBottom="12dp"
+            android:padding="16dp"
+            android:textSize="13sp"
+            android:textColor="@color/text_primary"
+            android:lineSpacingMultiplier="1.5"
+            android:background="@drawable/bg_surface_card"
+            android:visibility="gone" />
+
         <TextView
             android:id="@+id/tvHistoryEmpty"
             android:layout_width="match_parent"
