@@ -69,6 +69,11 @@ class StepTrackerService : Service(), StepDetector.StepListener {
             if (impliedSpeed > 8.0) return
             if (delta < 0.5 || delta > 200.0) return
 
+            // Feed speed into the classifier. Prefer the hardware speed from the fix
+            // (Doppler-based, more accurate than delta/time). Fall back to computed speed.
+            val speedForClassifier = if (loc.hasSpeed()) loc.speed.toDouble() else impliedSpeed
+            stepDetector.updateGpsSpeed(speedForClassifier, loc.time)
+
             // Capture each period's baseline the first time it receives a GPS delta.
             // This works across activity switches (a new period gets its own baseline).
             currentPeriod?.let { p ->
@@ -324,6 +329,10 @@ class StepTrackerService : Service(), StepDetector.StepListener {
                     sample.runVotes,
                     sample.walkVotes,
                     sample.totalVotes,
+                    sample.gpsSpeedMps?.let { "%.2f".format(Locale.US, it) } ?: "",
+                    sample.gpsVote ?: "",
+                    sample.effectiveRunVotes,
+                    sample.effectiveWalkVotes,
                     sample.previousActivity,
                     sample.currentActivity,
                     currentPeriod?.type ?: ActivityType.IDLE,
@@ -375,7 +384,9 @@ class StepTrackerService : Service(), StepDetector.StepListener {
             classifierDebugWriter = FileWriter(classifierDebugFile, false).apply {
                 append(
                     "wall_time_ms,session_elapsed_ms,event,step_number,interval_ms,spm," +
-                        "vote,run_votes,walk_votes,total_votes,previous_activity,current_activity," +
+                        "vote,run_votes,walk_votes,total_votes," +
+                        "gps_speed_mps,gps_vote,eff_run_votes,eff_walk_votes," +
+                        "previous_activity,current_activity," +
                         "current_period,walk_steps,run_steps,total_steps,walk_dist_m,run_dist_m," +
                         "gps_available\n"
                 )

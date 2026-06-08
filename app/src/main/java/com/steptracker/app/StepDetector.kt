@@ -7,28 +7,25 @@ import android.util.Log
 import kotlin.math.sqrt
 
 /**
- * Walk/run classifier — v7 (cadence-only, single threshold)
+ * Walk/run classifier — v8 (GPS-fused cadence, cooldown)
  *
- * Bug fixes over v6:
- * 1. Dead zone removed: in v6 the "dead zone" made classify() return RUNNING whenever
- *    the current state was RUNNING and SPM was 128-155. This meant every step during
- *    a brisk walk (or any transition) kept voting RUNNING → walkVotes never reached
- *    the threshold → permanently stuck in running. Single threshold (150 SPM) fixes this.
+ * Changes from v7:
+ * 1. CLASSIFY_SPM 150→165: real-session CSV data showed the user's natural
+ *    walking cadence was 147-154 SPM, right on the old threshold. Raising to
+ *    165 moves the boundary above brisk walking and into slow-jog territory.
  *
- * 2. INTERVAL_WINDOW 10→5: with a 10-step median, the cadence measurement only
- *    shifts after 5+ steps at the new pace. With 5 steps, sorted[2] (the median)
- *    flips after just 3 steps at the new pace. Transition is 3× faster.
+ * 2. GPS speed fusion: when a fresh GPS fix is available, the device's
+ *    instantaneous speed (m/s) is used as a strong additional vote signal.
+ *    GPS < 1.8 m/s (6.5 km/h) → clear walking  → counts as GPS_VOTE_WEIGHT walk votes.
+ *    GPS > 2.5 m/s (9.0 km/h) → clear running  → counts as GPS_VOTE_WEIGHT run votes.
+ *    1.8–2.5 m/s is ambiguous → GPS vote is neutral (0).
+ *    A GPS vote alone (4 extra votes) can tip the balance across either threshold
+ *    when combined with even a few matching cadence votes. When GPS is stale
+ *    (>3 s since last fix) it contributes nothing so cadence-only logic takes over.
  *
- * 3. Asymmetric vote thresholds: VOTES_TO_RUN=8 (hard to enter), VOTES_TO_WALK=6
- *    (easier to exit). This prevents false-positive running without locking the state.
- *
- * 4. Votes NOT cleared on transition: the sliding vote window naturally dilutes
- *    old votes. Clearing caused a cold-start after every switch.
- *
- * Kalman filter assessment: a Kalman filter on SPM would react faster to pace
- * changes while filtering noise. The vote window achieves similar smoothing at
- * lower complexity. The current design is sufficient; a Kalman filter on GPS
- * position would have more benefit (see StepTrackerService).
+ * 3. 10-second cooldown (from v8 interim commit): after any state switch, another
+ *    switch is blocked for MIN_STATE_DURATION_MS. Prevents rapid flickering from
+ *    short cadence noise bursts after a transition.
  */
 class StepDetector(private val listener: StepListener) : SensorEventListener {
 
@@ -41,6 +38,10 @@ class StepDetector(private val listener: StepListener) : SensorEventListener {
         val runVotes: Int,
         val walkVotes: Int,
         val totalVotes: Int,
+        val gpsSpeedMps: Double?,
+        val gpsVote: ActivityType?,
+        val effectiveRunVotes: Int,
+        val effectiveWalkVotes: Int,
         val previousActivity: ActivityType,
         val currentActivity: ActivityType
     )
@@ -73,31 +74,46 @@ class StepDetector(private val listener: StepListener) : SensorEventListener {
     private var lastMag        = 0f
     private var rising         = false
 
-    // ── Cadence window (short = responsive) ──────────────────────────────────
-    // 5-step median: after 3 steps at new pace, sorted[2] already reflects the change.
+    // ── Cadence window ────────────────────────────────────────────────────────
     private val INTERVAL_WINDOW = 5
     private val stepIntervals   = ArrayDeque<Long>(INTERVAL_WINDOW)
 
-    // Single SPM threshold — no dead zone.
-    // Research: brisk walk ≤ 140 SPM, slow jog ≥ 150 SPM.
-    private val CLASSIFY_SPM = 150
+    // Raised from 150 to 165: real-session data showed user's walking cadence
+    // of 147-154 SPM was indistinguishable from running at the old threshold.
+    private val CLASSIFY_SPM = 165
 
-    // ── Vote window (provides stability) ─────────────────────────────────────
+    // ── Vote window ───────────────────────────────────────────────────────────
     private val VOTE_WINDOW   = 10
-    private val VOTES_TO_RUN  = 8    // hard to enter: 8/10 must vote run
-    private val VOTES_TO_WALK = 6    // easier to exit: 6/10 must vote walk
+    private val VOTES_TO_RUN  = 8
+    private val VOTES_TO_WALK = 6
     private val classVotes    = ArrayDeque<ActivityType>(VOTE_WINDOW)
 
-    // Minimum time (ms) a state must be held before another switch is allowed.
-    // Prevents rapid flickering: data showed each walking window lasted only 3-5 sec
-    // before cadence noise pushed run_votes back to 8 and immediately reversed the switch.
+    // ── GPS speed fusion ──────────────────────────────────────────────────────
+    // Speed boundaries (m/s):  walk < 1.8 (6.5 km/h) | ambiguous | run > 2.5 (9 km/h)
+    private val GPS_WALK_MPS       = 1.8
+    private val GPS_RUN_MPS        = 2.5
+    // How many extra effective votes a clear GPS speed signal adds.
+    // With VOTE_WINDOW=10: 4 GPS votes + 2 cadence votes = 6 → meets VOTES_TO_WALK.
+    private val GPS_VOTE_WEIGHT    = 4
+    private val GPS_STALE_MS       = 3_000L   // ignore GPS speed older than 3 s
+
+    private var latestGpsSpeedMps: Double? = null
+    private var latestGpsTimeMs: Long      = 0L
+
+    /** Called by StepTrackerService on every validated GPS fix. */
+    fun updateGpsSpeed(speedMps: Double, fixTimeMs: Long) {
+        latestGpsSpeedMps = speedMps
+        latestGpsTimeMs   = fixTimeMs
+    }
+
+    // ── Cooldown ──────────────────────────────────────────────────────────────
     private val MIN_STATE_DURATION_MS = 10_000L
     private var lastStateChangeMs     = 0L
 
     var currentActivity = ActivityType.IDLE
         private set
 
-    // ── Debug properties (exposed for on-screen metrics + Logcat) ────────────
+    // ── Debug properties ─────────────────────────────────────────────────────
     val currentSpm: Int
         get() {
             if (stepIntervals.size < 2) return 0
@@ -106,8 +122,8 @@ class StepDetector(private val listener: StepListener) : SensorEventListener {
         }
     val lastIntervalMs: Long
         get() = if (stepIntervals.isNotEmpty()) stepIntervals.last() else 0L
-    val runVoteCount: Int  get() = classVotes.count { it == ActivityType.RUNNING }
-    val walkVoteCount: Int get() = classVotes.count { it == ActivityType.WALKING }
+    val runVoteCount: Int   get() = classVotes.count { it == ActivityType.RUNNING }
+    val walkVoteCount: Int  get() = classVotes.count { it == ActivityType.WALKING }
     val totalVoteCount: Int get() = classVotes.size
 
     // ── SensorEventListener ───────────────────────────────────────────────────
@@ -153,73 +169,80 @@ class StepDetector(private val listener: StepListener) : SensorEventListener {
         if (classVotes.size >= VOTE_WINDOW) classVotes.removeFirst()
         classVotes.addLast(vote)
 
-        val runVotes  = runVoteCount
-        val walkVotes = walkVoteCount
+        val rawRunVotes  = runVoteCount
+        val rawWalkVotes = walkVoteCount
+
+        // GPS fusion: compute extra votes from speed if the fix is fresh enough.
+        val gpsAge = wallMs - latestGpsTimeMs
+        val freshGpsSpeed = if (gpsAge <= GPS_STALE_MS) latestGpsSpeedMps else null
+        val gpsVote: ActivityType? = freshGpsSpeed?.let { spd ->
+            when {
+                spd < GPS_WALK_MPS -> ActivityType.WALKING
+                spd > GPS_RUN_MPS  -> ActivityType.RUNNING
+                else               -> null   // ambiguous band — contribute nothing
+            }
+        }
+        val effectiveRunVotes  = rawRunVotes  + if (gpsVote == ActivityType.RUNNING) GPS_VOTE_WEIGHT else 0
+        val effectiveWalkVotes = rawWalkVotes + if (gpsVote == ActivityType.WALKING) GPS_VOTE_WEIGHT else 0
 
         val previousActivity = currentActivity
 
-        // Bootstrap: resolve IDLE once we have enough cadence data
+        // Bootstrap: resolve IDLE once we have enough cadence data.
         if (currentActivity == ActivityType.IDLE && classVotes.size >= 5) {
-            currentActivity = if (runVotes > walkVotes) ActivityType.RUNNING else ActivityType.WALKING
+            currentActivity = if (effectiveRunVotes > effectiveWalkVotes) ActivityType.RUNNING
+                              else ActivityType.WALKING
             lastStateChangeMs = wallMs
-            Log.d("StepDebug", "bootstrap → $currentActivity  spm=$spm")
-            listener.onClassifierDebug(DebugSample(
-                event = "bootstrap",
-                wallTimeMs = wallMs,
-                intervalMs = intervalMs,
-                spm = spm,
-                vote = vote,
-                runVotes = runVotes,
-                walkVotes = walkVotes,
-                totalVotes = totalVoteCount,
-                previousActivity = previousActivity,
-                currentActivity = currentActivity
-            ))
+            Log.d("StepDebug", "bootstrap → $currentActivity  spm=$spm  gps=${freshGpsSpeed?.let { "%.1f".format(it) } ?: "n/a"}")
+            listener.onClassifierDebug(buildSample("bootstrap", wallMs, intervalMs, spm, vote,
+                rawRunVotes, rawWalkVotes, freshGpsSpeed, gpsVote,
+                effectiveRunVotes, effectiveWalkVotes, previousActivity))
             listener.onActivityChanged(currentActivity, wallMs)
         }
 
         val cooldownElapsed = wallMs - lastStateChangeMs >= MIN_STATE_DURATION_MS
         val newActivity = when (currentActivity) {
-            ActivityType.WALKING -> if (cooldownElapsed && runVotes  >= VOTES_TO_RUN)  ActivityType.RUNNING else ActivityType.WALKING
-            ActivityType.RUNNING -> if (cooldownElapsed && walkVotes >= VOTES_TO_WALK) ActivityType.WALKING else ActivityType.RUNNING
+            ActivityType.WALKING -> if (cooldownElapsed && effectiveRunVotes  >= VOTES_TO_RUN)  ActivityType.RUNNING else ActivityType.WALKING
+            ActivityType.RUNNING -> if (cooldownElapsed && effectiveWalkVotes >= VOTES_TO_WALK) ActivityType.WALKING else ActivityType.RUNNING
             ActivityType.IDLE    -> currentActivity
         }
 
         if (newActivity != currentActivity && newActivity != ActivityType.IDLE) {
             val beforeSwitch = currentActivity
-            Log.d("StepDebug", "SWITCH $currentActivity→$newActivity  spm=$spm  rv=$runVotes wv=$walkVotes")
+            Log.d("StepDebug", "SWITCH $currentActivity→$newActivity  spm=$spm  " +
+                "rv=$rawRunVotes wv=$rawWalkVotes  gps=${freshGpsSpeed?.let { "%.1f".format(it) } ?: "n/a"}  " +
+                "eff_rv=$effectiveRunVotes eff_wv=$effectiveWalkVotes")
             currentActivity = newActivity
             lastStateChangeMs = wallMs
-            listener.onClassifierDebug(DebugSample(
-                event = "switch",
-                wallTimeMs = wallMs,
-                intervalMs = intervalMs,
-                spm = spm,
-                vote = vote,
-                runVotes = runVotes,
-                walkVotes = walkVotes,
-                totalVotes = totalVoteCount,
-                previousActivity = beforeSwitch,
-                currentActivity = currentActivity
-            ))
+            listener.onClassifierDebug(buildSample("switch", wallMs, intervalMs, spm, vote,
+                rawRunVotes, rawWalkVotes, freshGpsSpeed, gpsVote,
+                effectiveRunVotes, effectiveWalkVotes, beforeSwitch))
             listener.onActivityChanged(currentActivity, wallMs)
         }
 
-        Log.d("StepDebug", "step iv=${intervalMs}ms spm=$spm vote=$vote rv=$runVotes wv=$walkVotes/${totalVoteCount} → $currentActivity")
-        listener.onClassifierDebug(DebugSample(
-            event = "step",
-            wallTimeMs = wallMs,
-            intervalMs = intervalMs,
-            spm = spm,
-            vote = vote,
-            runVotes = runVotes,
-            walkVotes = walkVotes,
-            totalVotes = totalVoteCount,
-            previousActivity = previousActivity,
-            currentActivity = currentActivity
-        ))
+        Log.d("StepDebug", "step spm=$spm vote=$vote rv=$rawRunVotes wv=$rawWalkVotes " +
+            "gps=${freshGpsSpeed?.let { "%.1f" .format(it) } ?: "-"} gpsVote=$gpsVote " +
+            "eff_rv=$effectiveRunVotes eff_wv=$effectiveWalkVotes → $currentActivity")
+        listener.onClassifierDebug(buildSample("step", wallMs, intervalMs, spm, vote,
+            rawRunVotes, rawWalkVotes, freshGpsSpeed, gpsVote,
+            effectiveRunVotes, effectiveWalkVotes, previousActivity))
         listener.onStep(wallMs, currentActivity)
     }
+
+    private fun buildSample(
+        event: String, wallMs: Long, intervalMs: Long,
+        spm: Int, vote: ActivityType,
+        rawRun: Int, rawWalk: Int,
+        gpsSpeed: Double?, gpsVote: ActivityType?,
+        effRun: Int, effWalk: Int,
+        prevActivity: ActivityType
+    ) = DebugSample(
+        event = event, wallTimeMs = wallMs, intervalMs = intervalMs,
+        spm = spm, vote = vote,
+        runVotes = rawRun, walkVotes = rawWalk, totalVotes = totalVoteCount,
+        gpsSpeedMps = gpsSpeed, gpsVote = gpsVote,
+        effectiveRunVotes = effRun, effectiveWalkVotes = effWalk,
+        previousActivity = prevActivity, currentActivity = currentActivity
+    )
 
     // ── Reset ─────────────────────────────────────────────────────────────────
 
@@ -228,5 +251,6 @@ class StepDetector(private val listener: StepListener) : SensorEventListener {
         currentActivity = seedActivity
         lastStepWallMs = 0L; lastMag = 0f; rising = false
         offsetInitialised = false; lastStateChangeMs = 0L
+        latestGpsSpeedMps = null; latestGpsTimeMs = 0L
     }
 }
