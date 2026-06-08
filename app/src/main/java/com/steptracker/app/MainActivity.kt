@@ -15,8 +15,6 @@ import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
-import androidx.recyclerview.widget.LinearLayoutManager
-import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.tabs.TabLayout
 import java.util.concurrent.TimeUnit
@@ -58,9 +56,10 @@ class MainActivity : AppCompatActivity() {
     private lateinit var btnStartStop: MaterialButton
     private lateinit var btnReset: MaterialButton
     private lateinit var btnCalibrate: MaterialButton
-    private lateinit var rvActivityLog: RecyclerView
-    private lateinit var tvEmptyHint: TextView
+    private lateinit var layoutTimeline: LinearLayout
+    private lateinit var timelineBar: LinearLayout
     private lateinit var tvLogTotals: TextView
+    private lateinit var tvEmptyHint: TextView
 
     // History
     private lateinit var tvHistorySummary: TextView
@@ -69,7 +68,6 @@ class MainActivity : AppCompatActivity() {
     private lateinit var tvHistoryEmpty: TextView
 
     private lateinit var scheduleView: ScheduleEmbeddedView
-    private lateinit var adapter: ActivityPeriodAdapter
     private lateinit var userPrefs: UserPrefs
     private lateinit var workoutHistory: WorkoutHistory
 
@@ -106,9 +104,10 @@ class MainActivity : AppCompatActivity() {
         btnStartStop      = findViewById(R.id.btnStartStop)
         btnReset          = findViewById(R.id.btnReset)
         btnCalibrate      = findViewById(R.id.btnCalibrate)
-        rvActivityLog     = findViewById(R.id.recyclerView)
-        tvEmptyHint       = findViewById(R.id.tvEmptyHint)
+        layoutTimeline    = findViewById(R.id.layoutTimeline)
+        timelineBar       = findViewById(R.id.timelineBar)
         tvLogTotals       = findViewById(R.id.tvLogTotals)
+        tvEmptyHint       = findViewById(R.id.tvEmptyHint)
 
         // History views
         tvHistorySummary  = findViewById(R.id.tvHistorySummary)
@@ -116,11 +115,7 @@ class MainActivity : AppCompatActivity() {
         rvHistory         = findViewById(R.id.rvHistory)
         tvHistoryEmpty    = findViewById(R.id.tvHistoryEmpty)
 
-        adapter = ActivityPeriodAdapter(mutableListOf())
-        rvActivityLog.layoutManager = LinearLayoutManager(this)
-        rvActivityLog.adapter = adapter
-
-        rvHistory.layoutManager = LinearLayoutManager(this)
+        rvHistory.layoutManager = androidx.recyclerview.widget.LinearLayoutManager(this)
 
         btnStartStop.setOnClickListener { toggleTracking() }
         btnReset.setOnClickListener     { confirmReset() }
@@ -266,20 +261,43 @@ class MainActivity : AppCompatActivity() {
         btnStartStop.text = if (svc.isTracking) "■  Stop" else "▶  Start"
         btnReset.visibility = if (!svc.isTracking && svc.totalSteps > 0) View.VISIBLE else View.GONE
 
-        // ── Activity log ──────────────────────────────────────────────────────
-        val filtered = svc.activityPeriods.filter { it.type != ActivityType.IDLE }
-        adapter.updateData(filtered)
-        tvEmptyHint.visibility = if (filtered.isEmpty()) View.VISIBLE else View.GONE
+        // ── Session timeline ──────────────────────────────────────────────────
+        val periods = svc.activityPeriods.filter { it.type != ActivityType.IDLE }
+        val totalMs = periods.sumOf { it.durationMs }.coerceAtLeast(1L)
 
-        if (filtered.isNotEmpty()) {
-            val walkMs = filtered.filter { it.type == ActivityType.WALKING }.sumOf { it.durationMs }
-            val runMs  = filtered.filter { it.type == ActivityType.RUNNING  }.sumOf { it.durationMs }
-            tvLogTotals.text =
-                "🚶 ${TimeUnit.MILLISECONDS.toMinutes(walkMs)}m  ${svc.formatDist(svc.walkDistM)}   " +
-                "🏃 ${TimeUnit.MILLISECONDS.toMinutes(runMs)}m  ${svc.formatDist(svc.runDistM)}"
-            tvLogTotals.visibility = View.VISIBLE
+        if (periods.isEmpty()) {
+            layoutTimeline.visibility = View.GONE
+            tvEmptyHint.visibility    = View.VISIBLE
         } else {
-            tvLogTotals.visibility = View.GONE
+            tvEmptyHint.visibility    = View.GONE
+            layoutTimeline.visibility = View.VISIBLE
+
+            // Rebuild bar segments (only when count changes to avoid flicker)
+            if (timelineBar.childCount != periods.size) {
+                timelineBar.removeAllViews()
+                val dp = resources.displayMetrics.density
+                val minPx = (4 * dp).toInt()
+                periods.forEachIndexed { i, p ->
+                    val seg = View(this)
+                    val color = if (p.type == ActivityType.RUNNING) 0xFFFF5722.toInt()
+                                else 0xFF14B86A.toInt()
+                    seg.setBackgroundColor(color)
+                    val weight = p.durationMs.toFloat() / totalMs
+                    val lp = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, weight)
+                    // Gaps between segments
+                    if (i > 0) lp.marginStart = (2 * dp).toInt()
+                    lp.width = lp.width.coerceAtLeast(minPx)
+                    timelineBar.addView(seg, lp)
+                }
+            }
+
+            // Summary line
+            val walkMs = periods.filter { it.type == ActivityType.WALKING }.sumOf { it.durationMs }
+            val runMs  = periods.filter { it.type == ActivityType.RUNNING  }.sumOf { it.durationMs }
+            tvLogTotals.text =
+                "🚶 Walk  ${formatDur(walkMs)}  ·  ${svc.formatDist(svc.walkDistM)}\n" +
+                "🏃 Run   ${formatDur(runMs)}  ·  ${svc.formatDist(svc.runDistM)}"
+            tvLogTotals.visibility = View.VISIBLE
         }
     }
 
