@@ -1,0 +1,248 @@
+STEP TRACKER ("LET'S GO") - COMMERCIALIZATION / PLAY STORE PLAN
+================================================================
+
+Goal
+----
+Turn the current AI branch into a Play Store-ready commercial beta, then move
+through internal testing, closed testing, and finally production only after the
+tracking/classification behavior is trustworthy.
+
+
+1. Commercial Scope
+-------------------
+Recommended first-store positioning:
+
+    Step tracking, walk/run detection, interval schedules, workout history,
+    and early on-device insights.
+
+Avoid over-promising as a full "AI fitness coach" for the first release.
+The current AI branch is better described as having beta/experimental insights
+generated from local workout history.
+
+Decisions needed:
+
+- App name: keep "Let's GO" or rename.
+- Business model: free, paid, or future premium.
+- Regions/languages: start with English only.
+- Audience: walkers/runners/general fitness users.
+
+Recommendation:
+
+Start with Play Store Internal Testing, then Closed Testing, then production.
+
+
+2. Product Readiness
+--------------------
+Must-have before Play testing:
+
+- First-launch onboarding that explains:
+    * why activity recognition is needed
+    * why location is optional/recommended
+    * why notifications are needed for foreground tracking
+    * how calibration improves distance accuracy
+
+- Clear calibration prompt before serious tracking.
+- Better empty states for History and Insights.
+- In-app note that Insights are experimental/estimated.
+- Simple About & Privacy screen:
+    * local data storage explanation
+    * version
+    * support/contact
+    * privacy summary
+
+Important product promise:
+
+    The app estimates fitness metrics. It should not imply medical accuracy.
+
+
+3. Data, AI, and Privacy Positioning
+------------------------------------
+Current AI branch has a strong privacy position:
+
+- Workout history is stored locally on-device.
+- Insights are generated on-device from local records.
+- No account required.
+- No workout data uploaded unless future cloud sync is added.
+- Location is used only during tracking/calibration if permission is granted.
+
+Required:
+
+- Public privacy policy URL for Play Console.
+- In-app privacy note.
+- Play Console Data Safety answers.
+
+Recommended wording:
+
+    Insights are informational and may be inaccurate if sensor data, GPS,
+    calibration, or activity classification is inaccurate.
+
+
+4. Algorithmic Reliability
+--------------------------
+This is the biggest commercial risk. If walk/run switching is wrong, user trust
+drops quickly.
+
+Before production:
+
+- Add unit tests for:
+    * walk/run classifier transitions
+    * cadence voting / hysteresis behavior
+    * distance calculations
+    * GPS-to-step distance transition baseline
+    * insights calculations
+
+- Capture real-world debug data for:
+    * cadence / SPM
+    * step intervals
+    * vote counts
+    * current classifier state
+    * activity transitions
+    * GPS accuracy / rejected fixes
+
+- Consider adding an in-app "Export debug session" option for beta testers.
+- Consider replacing raw LocationManager with FusedLocationProviderClient.
+- Label user-facing distance/activity values as estimated where appropriate.
+
+
+5. Android / Release Engineering
+--------------------------------
+Required before Play upload:
+
+- Create release signing key.
+- Configure signing via local keystore.properties (do not commit secrets).
+- Enable R8/minification for release.
+- Add ProGuard/R8 rules if needed.
+- Set versionCode and versionName properly.
+- Build Android App Bundle:
+
+    .\gradlew.bat bundleRelease
+
+- Confirm target SDK and Android 14 foreground service behavior.
+- Confirm notification permission behavior on Android 13+.
+- Test fresh install and upgrade from previous builds.
+
+Current known gap:
+
+    app/build.gradle still has minifyEnabled false for release.
+
+
+6. Play Policy / Compliance
+---------------------------
+Because the app uses activity recognition, location, notifications, and
+foreground service tracking, prepare:
+
+- Privacy Policy URL.
+- Data Safety form.
+- Foreground service declaration.
+- Location permission justification.
+- Activity recognition permission justification.
+- Content rating questionnaire.
+- Target audience selection.
+- Health/fitness disclaimer if relevant.
+
+Avoid:
+
+- claiming medical/diagnostic accuracy
+- implying professional health advice
+- overstating "AI coach" functionality
+
+
+7. Store Listing Assets
+-----------------------
+Needed:
+
+- App icon.
+- 512x512 Play icon.
+- Feature graphic 1024x500.
+- Phone screenshots:
+    * Tracking
+    * Schedule
+    * History + Insights
+    * Calibration
+
+- Short description (80 chars max).
+- Full description.
+- Support email.
+- Privacy policy URL.
+
+Possible short description:
+
+    Track walks, runs, intervals, distance, and progress insights.
+
+Possible full-description positioning:
+
+    Let's GO is a lightweight walk/run tracker focused on transparent
+    estimates, calibration, interval schedules, and local workout insights.
+
+
+8. Testing Strategy
+-------------------
+Recommended Play rollout:
+
+1. Internal Testing
+    - Install from Play on your own devices.
+    - Verify permissions, tracking, history migration, insights, and release
+      signing.
+
+2. Closed Testing
+    - 5-20 testers.
+    - Ask them to perform:
+        * walk only
+        * run only
+        * walk -> run -> walk
+        * indoor tracking without GPS
+        * outdoor GPS tracking
+        * calibration first, then tracking
+        * delete workouts
+        * background / lock-screen tracking
+
+3. Open Testing / Production Staged Rollout
+    - Start with 5-10%.
+    - Monitor crashes, feedback, and classifier complaints.
+
+
+9. Implementation Milestones
+----------------------------
+Milestone 1: Commercial Foundations
+
+- Add privacy policy.
+- Add in-app About & Privacy screen.
+- Add onboarding / permission rationale.
+- Add "Insights are experimental" note in-app.
+- Add release build config skeleton with safe keystore handling.
+
+Milestone 2: Reliability and Tests
+
+- Add classifier, distance, and insights tests.
+- Improve GPS handling / consider FusedLocationProviderClient.
+- Add debug export for classifier sessions.
+- Improve accessibility labels and color contrast checks.
+
+Milestone 3: Store Package
+
+- Prepare app icon, feature graphic, screenshots.
+- Draft Play listing text.
+- Draft Data Safety answers.
+- Build first signed AAB.
+
+Milestone 4: Testing Release
+
+- Upload to Internal Testing.
+- Install from Play.
+- Iterate based on real device data, crashes, and feedback.
+
+
+Recommended Next Step
+---------------------
+Do not go directly to production.
+
+First turn the AI branch into a commercial beta, with special focus on the
+walk/run transition issue. The classifier must be trustworthy before the app
+is positioned commercially.
+
+Immediate priority:
+
+    Capture real logs/metrics from your device while reproducing the failed
+    walk -> run -> walk transition.
+
+After that, use the evidence to tune or redesign the classifier.

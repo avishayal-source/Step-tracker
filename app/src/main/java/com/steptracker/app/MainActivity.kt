@@ -53,7 +53,6 @@ class MainActivity : AppCompatActivity() {
     private lateinit var tvTotalDist: TextView
     private lateinit var tvGpsIndicator: TextView
     private lateinit var tvStepSizes: TextView
-    private lateinit var tvDebugInfo: TextView
     private lateinit var tvWalkStats: TextView
     private lateinit var tvRunStats: TextView
     private lateinit var btnStartStop: MaterialButton
@@ -102,7 +101,6 @@ class MainActivity : AppCompatActivity() {
         tvTotalDist       = findViewById(R.id.tvTotalDist)
         tvGpsIndicator    = findViewById(R.id.tvGpsIndicator)
         tvStepSizes       = findViewById(R.id.tvStepSizes)
-        tvDebugInfo       = findViewById(R.id.tvDebugInfo)
         tvWalkStats       = findViewById(R.id.tvWalkStats)
         tvRunStats        = findViewById(R.id.tvRunStats)
         btnStartStop      = findViewById(R.id.btnStartStop)
@@ -263,9 +261,6 @@ class MainActivity : AppCompatActivity() {
 
         tvWalkStats.text = "🚶 Walk\n${svc.walkSteps} steps\n${svc.formatDist(svc.walkDistM)}"
         tvRunStats.text  = "🏃 Run\n${svc.runSteps} steps\n${svc.formatDist(svc.runDistM)}"
-
-        // ── Debug metrics ─────────────────────────────────────────────────────
-        tvDebugInfo.text = if (svc.isTracking) svc.debugInfo() else "—  (start tracking to see metrics)"
 
         // ── Buttons ───────────────────────────────────────────────────────────
         btnStartStop.text = if (svc.isTracking) "■  Stop" else "▶  Start"

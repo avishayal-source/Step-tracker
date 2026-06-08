@@ -13,6 +13,11 @@ import android.os.*
 import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
+import java.io.File
+import java.io.FileWriter
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 class StepTrackerService : Service(), StepDetector.StepListener {
 
@@ -98,6 +103,11 @@ class StepTrackerService : Service(), StepDetector.StepListener {
     // (~3/sec while running) wastes CPU/battery and gets rate-limited by Android.
     private var lastNotifUpdateMs = 0L
 
+    // Local CSV debug logs for outdoor walk/run tests. Stored in app-specific
+    // external files so they can be pulled later with adb or Device Explorer.
+    private var classifierDebugWriter: FileWriter? = null
+    private var classifierDebugFile: File? = null
+
     var onUpdateListener: (() -> Unit)? = null
 
     // ── Lifecycle ─────────────────────────────────────────────────────────────
@@ -132,6 +142,11 @@ class StepTrackerService : Service(), StepDetector.StepListener {
 
     override fun onBind(intent: Intent): IBinder = binder
 
+    override fun onDestroy() {
+        closeClassifierDebugLog()
+        super.onDestroy()
+    }
+
     // ── Public API ────────────────────────────────────────────────────────────
 
     fun startTracking(initialType: ActivityType = ActivityType.WALKING) {
@@ -141,6 +156,7 @@ class StepTrackerService : Service(), StepDetector.StepListener {
         sessionStartMs = System.currentTimeMillis()
         val seed = if (initialType == ActivityType.IDLE) ActivityType.WALKING else initialType
         stepDetector.reset(seed)
+        openClassifierDebugLog()
         sensorManager.registerListener(stepDetector,
             sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER),
             SensorManager.SENSOR_DELAY_GAME)
@@ -205,6 +221,7 @@ class StepTrackerService : Service(), StepDetector.StepListener {
         }
         updateNotification("Stopped – $totalSteps steps · ${formatDist(walkDistM + runDistM)}")
         onUpdateListener?.invoke()
+        closeClassifierDebugLog()
         stopForeground(STOP_FOREGROUND_DETACH)
     }
 
@@ -292,6 +309,39 @@ class StepTrackerService : Service(), StepDetector.StepListener {
         onUpdateListener?.invoke()
     }
 
+    override fun onClassifierDebug(sample: StepDetector.DebugSample) {
+        val writer = classifierDebugWriter ?: return
+        try {
+            writer.append(
+                listOf(
+                    sample.wallTimeMs,
+                    sample.wallTimeMs - sessionStartMs,
+                    sample.event,
+                    totalSteps + 1,
+                    sample.intervalMs,
+                    sample.spm,
+                    sample.vote,
+                    sample.runVotes,
+                    sample.walkVotes,
+                    sample.totalVotes,
+                    sample.previousActivity,
+                    sample.currentActivity,
+                    currentPeriod?.type ?: ActivityType.IDLE,
+                    walkSteps,
+                    runSteps,
+                    totalSteps,
+                    "%.2f".format(Locale.US, walkDistM),
+                    "%.2f".format(Locale.US, runDistM),
+                    gpsAvailable
+                ).joinToString(",")
+            )
+            writer.append('\n')
+            writer.flush()
+        } catch (_: Exception) {
+            closeClassifierDebugLog()
+        }
+    }
+
     // ── Helpers ───────────────────────────────────────────────────────────────
 
     private fun openNewPeriod(type: ActivityType, startMs: Long) {
@@ -315,15 +365,32 @@ class StepTrackerService : Service(), StepDetector.StepListener {
         }
     }
 
-    fun debugInfo(): String {
-        val det = stepDetector
-        val strideM = if (det.currentActivity == ActivityType.RUNNING) userPrefs.runStrideM
-                      else userPrefs.walkStrideM
-        val stepsPerTenM = if (strideM > 0) (10.0 / strideM).toInt() else 0
-        return "SPM: ${det.currentSpm}  interval: ${det.lastIntervalMs}ms  " +
-               "steps/10m: ~$stepsPerTenM\n" +
-               "Votes → run: ${det.runVoteCount}  walk: ${det.walkVoteCount}  " +
-               "window: ${det.totalVoteCount}/10  state: ${det.currentActivity}"
+    private fun openClassifierDebugLog() {
+        closeClassifierDebugLog()
+        try {
+            val dir = getExternalFilesDir("debug_logs") ?: File(filesDir, "debug_logs")
+            if (!dir.exists()) dir.mkdirs()
+            val stamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date(sessionStartMs))
+            classifierDebugFile = File(dir, "classifier_debug_$stamp.csv")
+            classifierDebugWriter = FileWriter(classifierDebugFile, false).apply {
+                append(
+                    "wall_time_ms,session_elapsed_ms,event,step_number,interval_ms,spm," +
+                        "vote,run_votes,walk_votes,total_votes,previous_activity,current_activity," +
+                        "current_period,walk_steps,run_steps,total_steps,walk_dist_m,run_dist_m," +
+                        "gps_available\n"
+                )
+                flush()
+            }
+        } catch (_: Exception) {
+            classifierDebugWriter = null
+            classifierDebugFile = null
+        }
+    }
+
+    private fun closeClassifierDebugLog() {
+        try { classifierDebugWriter?.flush() } catch (_: Exception) {}
+        try { classifierDebugWriter?.close() } catch (_: Exception) {}
+        classifierDebugWriter = null
     }
 
     private fun buildStatusText(): String {

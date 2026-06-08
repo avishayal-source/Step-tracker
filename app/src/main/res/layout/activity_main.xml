@@ -261,37 +261,6 @@
 
             </LinearLayout>
 
-            <!-- ── Debug metrics card ─────────────────────────────────── -->
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:layout_marginHorizontal="16dp"
-                android:layout_marginTop="16dp"
-                android:background="@drawable/bg_surface_card"
-                android:padding="14dp">
-
-                <TextView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="⚙ DEBUG METRICS"
-                    android:textSize="10sp"
-                    android:letterSpacing="0.15"
-                    android:textColor="@color/accent_cyan"
-                    android:fontFamily="sans-serif-medium"
-                    android:paddingBottom="6dp" />
-
-                <TextView
-                    android:id="@+id/tvDebugInfo"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="—"
-                    android:textSize="11sp"
-                    android:textColor="@color/text_secondary"
-                    android:fontFamily="monospace"
-                    android:lineSpacingMultiplier="1.5" />
-            </LinearLayout>
-
             <!-- ── Activity log ───────────────────────────────────────── -->
             <LinearLayout
                 android:layout_width="match_parent"

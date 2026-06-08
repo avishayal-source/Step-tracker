@@ -32,9 +32,23 @@ import kotlin.math.sqrt
  */
 class StepDetector(private val listener: StepListener) : SensorEventListener {
 
+    data class DebugSample(
+        val event: String,
+        val wallTimeMs: Long,
+        val intervalMs: Long,
+        val spm: Int,
+        val vote: ActivityType,
+        val runVotes: Int,
+        val walkVotes: Int,
+        val totalVotes: Int,
+        val previousActivity: ActivityType,
+        val currentActivity: ActivityType
+    )
+
     interface StepListener {
         fun onStep(wallTimeMs: Long, activity: ActivityType)
         fun onActivityChanged(newActivity: ActivityType, wallTimeMs: Long)
+        fun onClassifierDebug(sample: DebugSample)
     }
 
     // ── Sensor timestamp → wall-clock ─────────────────────────────────────────
@@ -73,6 +87,12 @@ class StepDetector(private val listener: StepListener) : SensorEventListener {
     private val VOTES_TO_RUN  = 8    // hard to enter: 8/10 must vote run
     private val VOTES_TO_WALK = 6    // easier to exit: 6/10 must vote walk
     private val classVotes    = ArrayDeque<ActivityType>(VOTE_WINDOW)
+
+    // Minimum time (ms) a state must be held before another switch is allowed.
+    // Prevents rapid flickering: data showed each walking window lasted only 3-5 sec
+    // before cadence noise pushed run_votes back to 8 and immediately reversed the switch.
+    private val MIN_STATE_DURATION_MS = 10_000L
+    private var lastStateChangeMs     = 0L
 
     var currentActivity = ActivityType.IDLE
         private set
@@ -136,26 +156,68 @@ class StepDetector(private val listener: StepListener) : SensorEventListener {
         val runVotes  = runVoteCount
         val walkVotes = walkVoteCount
 
+        val previousActivity = currentActivity
+
         // Bootstrap: resolve IDLE once we have enough cadence data
         if (currentActivity == ActivityType.IDLE && classVotes.size >= 5) {
             currentActivity = if (runVotes > walkVotes) ActivityType.RUNNING else ActivityType.WALKING
+            lastStateChangeMs = wallMs
             Log.d("StepDebug", "bootstrap → $currentActivity  spm=$spm")
+            listener.onClassifierDebug(DebugSample(
+                event = "bootstrap",
+                wallTimeMs = wallMs,
+                intervalMs = intervalMs,
+                spm = spm,
+                vote = vote,
+                runVotes = runVotes,
+                walkVotes = walkVotes,
+                totalVotes = totalVoteCount,
+                previousActivity = previousActivity,
+                currentActivity = currentActivity
+            ))
             listener.onActivityChanged(currentActivity, wallMs)
         }
 
+        val cooldownElapsed = wallMs - lastStateChangeMs >= MIN_STATE_DURATION_MS
         val newActivity = when (currentActivity) {
-            ActivityType.WALKING -> if (runVotes  >= VOTES_TO_RUN)  ActivityType.RUNNING else ActivityType.WALKING
-            ActivityType.RUNNING -> if (walkVotes >= VOTES_TO_WALK) ActivityType.WALKING else ActivityType.RUNNING
+            ActivityType.WALKING -> if (cooldownElapsed && runVotes  >= VOTES_TO_RUN)  ActivityType.RUNNING else ActivityType.WALKING
+            ActivityType.RUNNING -> if (cooldownElapsed && walkVotes >= VOTES_TO_WALK) ActivityType.WALKING else ActivityType.RUNNING
             ActivityType.IDLE    -> currentActivity
         }
 
         if (newActivity != currentActivity && newActivity != ActivityType.IDLE) {
+            val beforeSwitch = currentActivity
             Log.d("StepDebug", "SWITCH $currentActivity→$newActivity  spm=$spm  rv=$runVotes wv=$walkVotes")
             currentActivity = newActivity
+            lastStateChangeMs = wallMs
+            listener.onClassifierDebug(DebugSample(
+                event = "switch",
+                wallTimeMs = wallMs,
+                intervalMs = intervalMs,
+                spm = spm,
+                vote = vote,
+                runVotes = runVotes,
+                walkVotes = walkVotes,
+                totalVotes = totalVoteCount,
+                previousActivity = beforeSwitch,
+                currentActivity = currentActivity
+            ))
             listener.onActivityChanged(currentActivity, wallMs)
         }
 
         Log.d("StepDebug", "step iv=${intervalMs}ms spm=$spm vote=$vote rv=$runVotes wv=$walkVotes/${totalVoteCount} → $currentActivity")
+        listener.onClassifierDebug(DebugSample(
+            event = "step",
+            wallTimeMs = wallMs,
+            intervalMs = intervalMs,
+            spm = spm,
+            vote = vote,
+            runVotes = runVotes,
+            walkVotes = walkVotes,
+            totalVotes = totalVoteCount,
+            previousActivity = previousActivity,
+            currentActivity = currentActivity
+        ))
         listener.onStep(wallMs, currentActivity)
     }
 
@@ -165,6 +227,6 @@ class StepDetector(private val listener: StepListener) : SensorEventListener {
         stepIntervals.clear(); classVotes.clear()
         currentActivity = seedActivity
         lastStepWallMs = 0L; lastMag = 0f; rising = false
-        offsetInitialised = false
+        offsetInitialised = false; lastStateChangeMs = 0L
     }
 }
