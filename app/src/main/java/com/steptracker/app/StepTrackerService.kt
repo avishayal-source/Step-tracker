@@ -305,36 +305,114 @@ class StepTrackerService : Service(), StepDetector.StepListener {
         val prev = currentPeriod
         if (prev?.type == newActivity) return
 
+        val closedSteps = prev?.steps ?: 0
+
         prev?.let { p ->
             p.endTime = now
             if (p.endTime <= p.startTime) p.endTime = p.startTime + 1000
         }
+        val closedDurMs = prev?.durationMs ?: 0L
+
         openNewPeriod(newActivity, now)
+        appendClassifierDebugRow(
+            wallTimeMs = now,
+            event = "period_switch",
+            stepNumber = totalSteps,
+            intervalMs = 0L,
+            spm = stepDetector.currentSpm,
+            rawGpsMps = null,
+            filteredGpsMps = null,
+            kalmanGain = null,
+            gpsAgeMs = -1L,
+            inPlaceHold = false,
+            signalSource = "service",
+            desiredActivity = newActivity,
+            candidate = null,
+            dwellMs = 0L,
+            dwellRequiredMs = 0L,
+            cadenceRunVotes = 0,
+            cadenceWalkVotes = 0,
+            decisionReason = "period_open:${prev?.type ?: ActivityType.IDLE}->$newActivity " +
+                "closed_steps=$closedSteps closed_dur_ms=$closedDurMs period_count=${activityPeriods.size}",
+            previousActivity = prev?.type ?: ActivityType.IDLE,
+            currentActivity = newActivity
+        )
         recomputeTotals()
         onUpdateListener?.invoke()
     }
 
     override fun onClassifierDebug(sample: StepDetector.DebugSample) {
+        appendClassifierDebugRow(
+            wallTimeMs = sample.wallTimeMs,
+            event = sample.event,
+            stepNumber = if (sample.event == "gps_update") totalSteps else totalSteps + 1,
+            intervalMs = sample.intervalMs,
+            spm = sample.spm,
+            rawGpsMps = sample.rawGpsMps,
+            filteredGpsMps = sample.filteredGpsMps,
+            kalmanGain = sample.kalmanGain,
+            gpsAgeMs = sample.gpsAgeMs,
+            inPlaceHold = sample.inPlaceHold,
+            signalSource = sample.signalSource,
+            desiredActivity = sample.desiredActivity,
+            candidate = sample.candidate,
+            dwellMs = sample.dwellMs,
+            dwellRequiredMs = sample.dwellRequiredMs,
+            cadenceRunVotes = sample.cadenceRunVotes,
+            cadenceWalkVotes = sample.cadenceWalkVotes,
+            decisionReason = sample.decisionReason,
+            previousActivity = sample.previousActivity,
+            currentActivity = sample.currentActivity
+        )
+    }
+
+    private fun appendClassifierDebugRow(
+        wallTimeMs: Long,
+        event: String,
+        stepNumber: Int,
+        intervalMs: Long,
+        spm: Int,
+        rawGpsMps: Double?,
+        filteredGpsMps: Double?,
+        kalmanGain: Double?,
+        gpsAgeMs: Long,
+        inPlaceHold: Boolean,
+        signalSource: String,
+        desiredActivity: ActivityType?,
+        candidate: ActivityType?,
+        dwellMs: Long,
+        dwellRequiredMs: Long,
+        cadenceRunVotes: Int,
+        cadenceWalkVotes: Int,
+        decisionReason: String,
+        previousActivity: ActivityType,
+        currentActivity: ActivityType
+    ) {
         val writer = classifierDebugWriter ?: return
         try {
             writer.append(
                 listOf(
-                    sample.wallTimeMs,
-                    sample.wallTimeMs - sessionStartMs,
-                    sample.event,
-                    totalSteps + 1,
-                    sample.intervalMs,
-                    sample.spm,
-                    sample.vote,
-                    sample.runVotes,
-                    sample.walkVotes,
-                    sample.totalVotes,
-                    sample.gpsSpeedMps?.let { "%.2f".format(Locale.US, it) } ?: "",
-                    sample.gpsVote ?: "",
-                    sample.effectiveRunVotes,
-                    sample.effectiveWalkVotes,
-                    sample.previousActivity,
-                    sample.currentActivity,
+                    wallTimeMs,
+                    wallTimeMs - sessionStartMs,
+                    event,
+                    stepNumber,
+                    intervalMs,
+                    spm,
+                    rawGpsMps?.let { "%.2f".format(Locale.US, it) } ?: "",
+                    filteredGpsMps?.let { "%.2f".format(Locale.US, it) } ?: "",
+                    kalmanGain?.let { "%.4f".format(Locale.US, it) } ?: "",
+                    gpsAgeMs,
+                    inPlaceHold,
+                    signalSource,
+                    desiredActivity ?: "",
+                    candidate ?: "",
+                    dwellMs,
+                    dwellRequiredMs,
+                    cadenceRunVotes,
+                    cadenceWalkVotes,
+                    decisionReason.replace(',', ';'),
+                    previousActivity,
+                    currentActivity,
                     currentPeriod?.type ?: ActivityType.IDLE,
                     walkSteps,
                     runSteps,
@@ -384,8 +462,9 @@ class StepTrackerService : Service(), StepDetector.StepListener {
             classifierDebugWriter = FileWriter(classifierDebugFile, false).apply {
                 append(
                     "wall_time_ms,session_elapsed_ms,event,step_number,interval_ms,spm," +
-                        "vote,run_votes,walk_votes,total_votes," +
-                        "gps_speed_mps,gps_vote,eff_run_votes,eff_walk_votes," +
+                        "raw_gps_mps,filtered_gps_mps,kalman_gain,gps_age_ms,in_place_hold," +
+                        "signal_source,desired_activity,candidate,dwell_ms,dwell_required_ms," +
+                        "cadence_run_votes,cadence_walk_votes,decision_reason," +
                         "previous_activity,current_activity," +
                         "current_period,walk_steps,run_steps,total_steps,walk_dist_m,run_dist_m," +
                         "gps_available\n"

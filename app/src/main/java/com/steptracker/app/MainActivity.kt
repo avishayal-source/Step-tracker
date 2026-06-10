@@ -273,11 +273,11 @@ class MainActivity : AppCompatActivity() {
             tvEmptyHint.visibility    = View.GONE
             layoutTimeline.visibility = View.VISIBLE
 
-            // Rebuild bar segments (only when count changes to avoid flicker)
+            // Rebuild bar when period count changes; always refresh segment weights
+            // (live period duration grows every tick — stale weights made the bar look wrong).
+            val dp = resources.displayMetrics.density
             if (timelineBar.childCount != periods.size) {
                 timelineBar.removeAllViews()
-                val dp = resources.displayMetrics.density
-                val minPx = (4 * dp).toInt()
                 periods.forEachIndexed { i, p ->
                     val seg = View(this)
                     val color = if (p.type == ActivityType.RUNNING) 0xFFFF5722.toInt()
@@ -285,11 +285,17 @@ class MainActivity : AppCompatActivity() {
                     seg.setBackgroundColor(color)
                     val weight = p.durationMs.toFloat() / totalMs
                     val lp = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, weight)
-                    // Gaps between segments
                     if (i > 0) lp.marginStart = (2 * dp).toInt()
-                    lp.width = lp.width.coerceAtLeast(minPx)
                     timelineBar.addView(seg, lp)
                 }
+            } else {
+                periods.forEachIndexed { i, p ->
+                    val seg = timelineBar.getChildAt(i) ?: return@forEachIndexed
+                    val lp = seg.layoutParams as LinearLayout.LayoutParams
+                    lp.weight = p.durationMs.toFloat() / totalMs
+                    seg.layoutParams = lp
+                }
+                timelineBar.requestLayout()
             }
 
             // Summary line
