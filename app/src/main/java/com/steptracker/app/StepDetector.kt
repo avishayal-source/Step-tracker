@@ -21,9 +21,12 @@ import kotlin.math.sqrt
  *    GPS speed is noisy (~1 Hz, multipath) — the classic case where a Kalman filter
  *    helps. Updated once per fix in updateGpsSpeed().
  *
- * 2. HYSTERESIS BAND on the filtered speed:
- *      WALKING → RUNNING  when filtered speed sustained above RUN_ENTER_MPS (1.6)
- *      RUNNING → WALKING  when filtered speed sustained below RUN_EXIT_MPS  (1.35)
+ * 2. HYSTERESIS BAND on the filtered speed (v10 recalibration):
+ *      WALKING → RUNNING  when filtered speed sustained above RUN_ENTER_MPS (1.9)
+ *      RUNNING → WALKING  when filtered speed sustained below RUN_EXIT_MPS  (1.7)
+ *    A later session showed brisk walking reaching ~1.65 m/s (p90), which straddled
+ *    the old 1.35 exit threshold and caused 300–600-step run→walk lag. The true
+ *    walk/run boundary for this user is ~1.8 m/s (walk median 1.45, run median 2.38).
  *
  * 3. IN-PLACE HOLD (the key fix): when filtered speed collapses below LOW_WALK_MPS
  *    (0.8 m/s) the user is NOT walking forward — they are stopped or running in place
@@ -31,16 +34,19 @@ import kotlin.math.sqrt
  *    speed drops to ~0). Near-zero speed is therefore treated as "paused / in place"
  *    and the current activity is HELD, never flipped to walking.
  *
- * 4. DWELL GATE: a candidate switch must persist for STATE_DWELL_MS (18 s) before it
- *    commits. This rides through brief GPS dips (crossings, occlusion, short pauses)
- *    without flickering. Replaces the old fixed cooldown.
+ * 4. LEAKY-BUCKET DWELL (v10): evidence for a switch accumulates over time and
+ *    DECAYS when the evidence reverses, instead of hard-resetting on every GPS
+ *    wobble across the threshold. The v9 hard reset restarted an 18 s timer every
+ *    time noisy speed poked back over the boundary, so a switch almost never
+ *    committed near the walk/run boundary. The bucket commits once net evidence
+ *    reaches STATE_DWELL_MS (8 s), riding through brief dips and noise.
  *
  * 5. CADENCE FALLBACK: when no fresh GPS fix is available (e.g. indoor treadmill),
  *    fall back to cadence-vote majority so the app still classifies something.
  *
- * Validated offline against the 5,626-step session: switches dropped from 124 → 2,
- * matching ground truth (walk→run early, run→walk near the end), with 73 in-place
- * running steps correctly held in RUNNING.
+ * Validated offline against two real sessions. On the brisk-walk session the
+ * run→walk lag dropped from ~376/630 steps (v9) to ~50 steps (v10), matching all
+ * six user-reported transitions including a brief mid-run walk while tying laces.
  */
 class StepDetector(private val listener: StepListener) : SensorEventListener {
 
@@ -140,20 +146,24 @@ class StepDetector(private val listener: StepListener) : SensorEventListener {
             inPlaceHold = false,
             signalSource = "gps",
             desiredActivity = null,
-            dwellMs = if (stateCandidate != null) fixTimeMs - stateCandidateSinceMs else 0L,
+            dwellMs = switchAccumMs.toLong(),
             decisionReason = "kalman_update",
             prevActivity = currentActivity
         )
     }
 
     // ── Classification thresholds (m/s on the filtered speed) ─────────────────
-    private val RUN_ENTER_MPS = 1.6    // walk → run above this (sustained)
-    private val RUN_EXIT_MPS  = 1.35   // run → walk below this (sustained) …
+    private val RUN_ENTER_MPS = 1.9    // walk → run above this (sustained)
+    private val RUN_EXIT_MPS  = 1.7    // run → walk below this (sustained) …
     private val LOW_WALK_MPS  = 0.8    // … but above this. Below = in-place/paused → HOLD
-    private val STATE_DWELL_MS = 18_000L
+    private val STATE_DWELL_MS = 8_000L
+    private val DWELL_DECAY    = 1.0   // leaky-bucket: counter-evidence drains at this × dt
 
+    // Leaky-bucket switch evidence. switchAccumMs accumulates time toward the pending
+    // switch (stateCandidate) and drains when evidence reverses, so brief GPS wobble
+    // across the threshold no longer hard-resets progress (the v9 fragility).
     private var stateCandidate: ActivityType? = null
-    private var stateCandidateSinceMs = 0L
+    private var switchAccumMs = 0.0
 
     var currentActivity = ActivityType.IDLE
         private set
@@ -265,11 +275,7 @@ class StepDetector(private val listener: StepListener) : SensorEventListener {
                         ActivityType.RUNNING -> if (filtered < RUN_EXIT_MPS)  ActivityType.WALKING else ActivityType.RUNNING
                         else -> currentActivity
                     }
-                    decisionReason = when {
-                        desired == currentActivity -> "stable"
-                        stateCandidate == desired -> "dwell_pending"
-                        else -> "candidate_new"
-                    }
+                    decisionReason = if (desired == currentActivity) "stable" else "dwell_pending"
                 }
             } else {
                 signalSource = "cadence_fallback"
@@ -278,44 +284,43 @@ class StepDetector(private val listener: StepListener) : SensorEventListener {
                     ActivityType.RUNNING -> if (walkVoteCount >= VOTES_TO_WALK) ActivityType.WALKING else ActivityType.RUNNING
                     else -> currentActivity
                 }
-                decisionReason = when {
-                    desired == currentActivity -> "stable_cadence"
-                    stateCandidate == desired -> "dwell_pending_cadence"
-                    else -> "candidate_new_cadence"
-                }
+                decisionReason = if (desired == currentActivity) "stable_cadence" else "dwell_pending_cadence"
             }
 
-            if (desired == currentActivity) {
-                if (stateCandidate != null) {
-                    emitDebug("candidate_reset", wallMs, intervalMs, spm, filtered, inPlaceHold,
-                        signalSource, desired, 0L, "candidate_abandoned", previousActivity)
-                }
-                stateCandidate = null
-            } else if (desired != null) {
+            // ── Leaky-bucket dwell gate ───────────────────────────────────────
+            // dt is the step interval, clamped so a long GPS gap can't dump a huge
+            // chunk of evidence in (or out) of the bucket in one step.
+            val dtMs = intervalMs.toDouble().coerceIn(0.0, 2_000.0)
+            if (inPlaceHold || desired == null || desired == currentActivity) {
+                // No switch wanted (or paused): drain evidence.
+                switchAccumMs = (switchAccumMs - dtMs * DWELL_DECAY).coerceAtLeast(0.0)
+                if (switchAccumMs == 0.0) stateCandidate = null
+            } else {
+                // Switch wanted: a new target restarts the bucket; same target fills it.
                 if (stateCandidate != desired) {
                     stateCandidate = desired
-                    stateCandidateSinceMs = wallMs
+                    switchAccumMs = 0.0
                     emitDebug("candidate_start", wallMs, intervalMs, spm, filtered, inPlaceHold,
                         signalSource, desired, 0L, decisionReason, previousActivity)
-                } else if (wallMs - stateCandidateSinceMs >= STATE_DWELL_MS) {
+                }
+                switchAccumMs += dtMs
+                if (switchAccumMs >= STATE_DWELL_MS) {
                     val beforeSwitch = currentActivity
                     currentActivity = desired
                     stateCandidate = null
+                    switchAccumMs = 0.0
                     decisionReason = "switch_committed"
                     Log.d("StepDebug", "SWITCH $beforeSwitch→$currentActivity  " +
                         "filt=${filtered?.let { "%.2f".format(it) } ?: "n/a"}  spm=$spm")
                     emitDebug("switch", wallMs, intervalMs, spm, filtered, inPlaceHold,
                         signalSource, desired, 0L, decisionReason, beforeSwitch)
                     listener.onActivityChanged(currentActivity, wallMs)
-                } else {
-                    decisionReason = if (signalSource == "cadence_fallback") "dwell_pending_cadence" else "dwell_pending"
                 }
             }
         }
 
-        val dwellMs = if (stateCandidate != null) wallMs - stateCandidateSinceMs else 0L
-        if (decisionReason !in setOf("bootstrap_gps", "bootstrap_cadence", "switch_committed", "candidate_new",
-                "candidate_new_cadence", "candidate_abandoned")) {
+        val dwellMs = switchAccumMs.toLong()
+        if (decisionReason !in setOf("bootstrap_gps", "bootstrap_cadence", "switch_committed")) {
             emitDebug("step", wallMs, intervalMs, spm, filtered, inPlaceHold,
                 signalSource, desired, dwellMs, decisionReason, previousActivity)
         }
@@ -365,7 +370,7 @@ class StepDetector(private val listener: StepListener) : SensorEventListener {
         currentActivity = seedActivity
         lastStepWallMs = 0L; lastMag = 0f; rising = false
         offsetInitialised = false
-        stateCandidate = null; stateCandidateSinceMs = 0L
+        stateCandidate = null; switchAccumMs = 0.0
         kalmanInitialised = false; kalmanX = 0.0; kalmanP = 1.0; lastKalmanGain = null
         latestGpsRawSpeedMps = null; latestGpsTimeMs = 0L
     }
