@@ -498,7 +498,7 @@ class StepTrackerService : Service(), StepDetector.StepListener {
     // ── Notification ──────────────────────────────────────────────────────────
 
     private fun createNotificationChannel() {
-        val ch = NotificationChannel(CHANNEL_ID, "Let's GO", NotificationManager.IMPORTANCE_LOW)
+        val ch = NotificationChannel(CHANNEL_ID, "Y Walk", NotificationManager.IMPORTANCE_LOW)
             .apply { description = "Step tracking status" }
         getSystemService(NotificationManager::class.java).createNotificationChannel(ch)
     }
@@ -507,7 +507,7 @@ class StepTrackerService : Service(), StepDetector.StepListener {
         val pi = PendingIntent.getActivity(this, 0,
             Intent(this, MainActivity::class.java), PendingIntent.FLAG_IMMUTABLE)
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle("Let's GO").setContentText(text)
+            .setContentTitle("Y Walk").setContentText(text)
             .setSmallIcon(android.R.drawable.ic_media_play)
             .setContentIntent(pi).setOngoing(true).build()
     }

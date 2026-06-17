@@ -43,6 +43,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var pageTracking: View
     private lateinit var pageSchedule: View
     private lateinit var pageHistory: View
+    private lateinit var pageCoach: View
 
     // Tracking
     private lateinit var tvStepCount: TextView
@@ -69,6 +70,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var tvHistoryEmpty: TextView
 
     private lateinit var scheduleView: ScheduleEmbeddedView
+    private lateinit var coachView: CoachView
     private lateinit var userPrefs: UserPrefs
     private lateinit var workoutHistory: WorkoutHistory
 
@@ -91,6 +93,7 @@ class MainActivity : AppCompatActivity() {
         pageTracking = findViewById(R.id.pageTracking)
         pageSchedule = findViewById(R.id.pageSchedule)
         pageHistory  = findViewById(R.id.pageHistory)
+        pageCoach    = findViewById(R.id.pageCoach)
 
         // Tracking views
         tvStepCount         = findViewById(R.id.tvStepCount)
@@ -125,11 +128,15 @@ class MainActivity : AppCompatActivity() {
         scheduleView = ScheduleEmbeddedView(this, pageSchedule)
         scheduleView.setup()
 
+        coachView = CoachView(this, pageCoach)
+        coachView.setup()
+
         tabLayout.addOnTabSelectedListener(object : TabLayout.OnTabSelectedListener {
             override fun onTabSelected(tab: TabLayout.Tab) {
                 pageTracking.visibility = if (tab.position == 0) View.VISIBLE else View.GONE
                 pageSchedule.visibility = if (tab.position == 1) View.VISIBLE else View.GONE
                 pageHistory.visibility  = if (tab.position == 2) View.VISIBLE else View.GONE
+                pageCoach.visibility    = if (tab.position == 3) View.VISIBLE else View.GONE
                 if (tab.position == 2) updateHistoryUI()
             }
             override fun onTabUnselected(t: TabLayout.Tab?) {}
