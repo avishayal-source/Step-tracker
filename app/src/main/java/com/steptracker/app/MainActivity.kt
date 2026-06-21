@@ -22,6 +22,10 @@ import java.util.concurrent.TimeUnit
 
 class MainActivity : AppCompatActivity() {
 
+    companion object {
+        const val EXTRA_OPEN_SCHEDULE = "extra_open_schedule"
+    }
+
     private var service: StepTrackerService? = null
     private var isBound = false
     private val connection = object : ServiceConnection {
@@ -54,6 +58,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var tvGpsIndicator: TextView
     private lateinit var tvStepSizes: TextView
     private lateinit var tvWalkStats: TextView
+    private lateinit var tvJogStats: TextView
     private lateinit var tvRunStats: TextView
     private lateinit var btnStartStop: MaterialButton
     private lateinit var btnReset: MaterialButton
@@ -104,6 +109,7 @@ class MainActivity : AppCompatActivity() {
         tvGpsIndicator    = findViewById(R.id.tvGpsIndicator)
         tvStepSizes       = findViewById(R.id.tvStepSizes)
         tvWalkStats       = findViewById(R.id.tvWalkStats)
+        tvJogStats        = findViewById(R.id.tvJogStats)
         tvRunStats        = findViewById(R.id.tvRunStats)
         btnStartStop      = findViewById(R.id.btnStartStop)
         btnReset          = findViewById(R.id.btnReset)
@@ -130,6 +136,7 @@ class MainActivity : AppCompatActivity() {
 
         coachView = CoachView(this, pageCoach)
         coachView.setup()
+        coachView.onPlanActivated = { tabLayout.getTabAt(1)?.select() }
 
         tabLayout.addOnTabSelectedListener(object : TabLayout.OnTabSelectedListener {
             override fun onTabSelected(tab: TabLayout.Tab) {
@@ -137,6 +144,7 @@ class MainActivity : AppCompatActivity() {
                 pageSchedule.visibility = if (tab.position == 1) View.VISIBLE else View.GONE
                 pageHistory.visibility  = if (tab.position == 2) View.VISIBLE else View.GONE
                 pageCoach.visibility    = if (tab.position == 3) View.VISIBLE else View.GONE
+                if (tab.position == 1) scheduleView.loadTodaysPlannedWorkout()
                 if (tab.position == 2) updateHistoryUI()
             }
             override fun onTabUnselected(t: TabLayout.Tab?) {}
@@ -147,6 +155,21 @@ class MainActivity : AppCompatActivity() {
 
         if (!userPrefs.isCalibrated)
             Toast.makeText(this, "Tip: tap ⚙ Calibrate to set your personal step length", Toast.LENGTH_LONG).show()
+
+        handleIntentExtras(intent)
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        handleIntentExtras(intent)
+    }
+
+    /** Open the Schedule tab (and load today's workout) when launched from a reminder. */
+    private fun handleIntentExtras(intent: Intent?) {
+        if (intent?.getBooleanExtra(EXTRA_OPEN_SCHEDULE, false) == true) {
+            tabLayout.post { tabLayout.getTabAt(1)?.select() }
+        }
     }
 
     override fun onDestroy() {
@@ -229,19 +252,21 @@ class MainActivity : AppCompatActivity() {
         tvSessionElapsed.visibility      = if (showElapsed) View.VISIBLE else View.GONE
         tvSessionElapsedLabel.visibility = if (showElapsed) View.VISIBLE else View.GONE
 
-        // ── Activity pill with dynamic colour ─────────────────────────────────
+        // ── Activity pill with dynamic colour (Walking / Jogging / Running) ──────
         val activityType = svc.currentPeriod?.type
         tvCurrentActivity.text = when {
-            !svc.isTracking        -> "Not tracking"
-            activityType == ActivityType.RUNNING -> "🏃 Running / Jogging"
+            !svc.isTracking -> "Not tracking"
+            activityType == ActivityType.RUNNING -> "🏃 Running"
+            activityType == ActivityType.JOGGING -> "🏃 Jogging"
             activityType == ActivityType.WALKING -> "🚶 Walking"
-            else                   -> "⏸ Idle"
+            else            -> "⏸ Idle"
         }
         val pillColor = when {
-            !svc.isTracking        -> ContextCompat.getColor(this, R.color.surface_elevated)
+            !svc.isTracking -> ContextCompat.getColor(this, R.color.surface_elevated)
             activityType == ActivityType.RUNNING -> 0xBFFF5722.toInt()   // coral-orange
+            activityType == ActivityType.JOGGING -> 0xBFFFA000.toInt()   // amber (mid tier)
             activityType == ActivityType.WALKING -> 0xBF14B86A.toInt()   // emerald
-            else                   -> ContextCompat.getColor(this, R.color.surface_elevated)
+            else            -> ContextCompat.getColor(this, R.color.surface_elevated)
         }
         tvCurrentActivity.backgroundTintList = ColorStateList.valueOf(pillColor)
 
@@ -256,13 +281,14 @@ class MainActivity : AppCompatActivity() {
         }
 
         // ── Distance + step sizes ─────────────────────────────────────────────
-        tvTotalDist.text = svc.formatDist(svc.walkDistM + svc.runDistM)
+        tvTotalDist.text = svc.formatDist(svc.walkDistM + svc.jogDistM + svc.runDistM)
 
         val walkSizeStr = if (userPrefs.isCalibrated) "${"%.2f".format(userPrefs.walkStrideM)} m" else "–"
         val runSizeStr  = if (userPrefs.isCalibrated) "${"%.2f".format(userPrefs.runStrideM)} m" else "–"
         tvStepSizes.text = "Step:  🚶 $walkSizeStr   🏃 $runSizeStr"
 
         tvWalkStats.text = "🚶 Walk\n${svc.walkSteps} steps\n${svc.formatDist(svc.walkDistM)}"
+        tvJogStats.text  = "🏃 Jog\n${svc.jogSteps} steps\n${svc.formatDist(svc.jogDistM)}"
         tvRunStats.text  = "🏃 Run\n${svc.runSteps} steps\n${svc.formatDist(svc.runDistM)}"
 
         // ── Buttons ───────────────────────────────────────────────────────────
@@ -287,8 +313,11 @@ class MainActivity : AppCompatActivity() {
                 timelineBar.removeAllViews()
                 periods.forEachIndexed { i, p ->
                     val seg = View(this)
-                    val color = if (p.type == ActivityType.RUNNING) 0xFFFF5722.toInt()
-                                else 0xFF14B86A.toInt()
+                    val color = when (p.type) {
+                        ActivityType.RUNNING -> 0xFFFF5722.toInt()   // coral-orange
+                        ActivityType.JOGGING -> 0xFFFFA000.toInt()   // amber
+                        else                 -> 0xFF14B86A.toInt()   // emerald (walk)
+                    }
                     seg.setBackgroundColor(color)
                     val weight = p.durationMs.toFloat() / totalMs
                     val lp = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, weight)
@@ -307,9 +336,11 @@ class MainActivity : AppCompatActivity() {
 
             // Summary line
             val walkMs = periods.filter { it.type == ActivityType.WALKING }.sumOf { it.durationMs }
-            val runMs  = periods.filter { it.type == ActivityType.RUNNING  }.sumOf { it.durationMs }
+            val jogMs  = periods.filter { it.type == ActivityType.JOGGING }.sumOf { it.durationMs }
+            val runMs  = periods.filter { it.type == ActivityType.RUNNING }.sumOf { it.durationMs }
             tvLogTotals.text =
                 "🚶 Walk  ${formatDur(walkMs)}  ·  ${svc.formatDist(svc.walkDistM)}\n" +
+                "🏃 Jog   ${formatDur(jogMs)}  ·  ${svc.formatDist(svc.jogDistM)}\n" +
                 "🏃 Run   ${formatDur(runMs)}  ·  ${svc.formatDist(svc.runDistM)}"
             tvLogTotals.visibility = View.VISIBLE
         }

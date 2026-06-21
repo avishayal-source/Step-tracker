@@ -36,9 +36,14 @@ class ActivityPeriodAdapter(private val periods: MutableList<ActivityPeriod>) :
 
         when (period.type) {
             ActivityType.RUNNING -> {
-                holder.tvType.text = "🏃 Running / Jogging"
+                holder.tvType.text = "🏃 Running"
                 holder.card.setCardBackgroundColor(ctx.getColor(R.color.color_running))
                 holder.viewBar.setBackgroundColor(0xFFFF5722.toInt())
+            }
+            ActivityType.JOGGING -> {
+                holder.tvType.text = "🏃 Jogging"
+                holder.card.setCardBackgroundColor(ctx.getColor(R.color.color_running))
+                holder.viewBar.setBackgroundColor(0xFFFFA000.toInt())
             }
             ActivityType.WALKING -> {
                 holder.tvType.text = "🚶 Walking"

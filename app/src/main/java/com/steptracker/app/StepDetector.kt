@@ -7,46 +7,48 @@ import android.util.Log
 import kotlin.math.sqrt
 
 /**
- * Walk/run classifier — v9 (GPS-speed Kalman, in-place hold, dwell-gated)
+ * Walk/run classifier — v11 (GPS-speed Kalman + accelerometer gait gate, jogging tier)
  *
- * Why this is a full redesign:
- * Real-session CSV analysis (5,626 steps) showed the device's cadence is useless
- * for separating walking from running: median walking cadence was 196 SPM and
- * median running cadence was 189 SPM — fully overlapping (the accelerometer counts
- * roughly double the real steps on this hardware). GPS speed, however, separated
- * the two cleanly: walking ≈ 1.1 m/s (p90 = 1.23), running ≈ 2.15 m/s (p10 = 1.54).
+ * What v10 got wrong (June 18 session, 6,260 steps):
+ * The user ran continuously from step ~486 to ~5043, but the run included slow
+ * UPHILL stretches where GPS speed sagged to 1.43–1.66 m/s — straight into the band
+ * that overlaps brisk walking. Because v10 used GPS speed as the SOLE primary signal
+ * (run→walk below RUN_EXIT = 1.7), it chopped the single run into three false walking
+ * blips. The smoking gun: at step 4034 cadence was 208 SPM with 10/10 "running" votes
+ * — the gait signal was certain it was running — yet speed (1.43) forced WALKING.
+ * Speed alone cannot separate slow uphill running from brisk walking; gait can.
  *
- * Design:
- * 1. PRIMARY SIGNAL = GPS speed, smoothed by a 1-D Kalman filter (random-walk model).
- *    GPS speed is noisy (~1 Hz, multipath) — the classic case where a Kalman filter
- *    helps. Updated once per fix in updateGpsSpeed().
+ * Design (changes from v10 in CAPS):
+ * 1. PRIMARY SIGNAL = GPS speed, smoothed by a 1-D Kalman filter (random-walk model),
+ *    updated once per fix in updateGpsSpeed().
  *
- * 2. HYSTERESIS BAND on the filtered speed (v10 recalibration):
- *      WALKING → RUNNING  when filtered speed sustained above RUN_ENTER_MPS (1.9)
- *      RUNNING → WALKING  when filtered speed sustained below RUN_EXIT_MPS  (1.7)
- *    A later session showed brisk walking reaching ~1.65 m/s (p90), which straddled
- *    the old 1.35 exit threshold and caused 300–600-step run→walk lag. The true
- *    walk/run boundary for this user is ~1.8 m/s (walk median 1.45, run median 2.38).
+ * 2. HYSTERESIS BAND on filtered speed: walk→run above RUN_ENTER_MPS (1.9),
+ *    run→walk below RUN_EXIT_MPS (1.7).
  *
- * 3. IN-PLACE HOLD (the key fix): when filtered speed collapses below LOW_WALK_MPS
- *    (0.8 m/s) the user is NOT walking forward — they are stopped or running in place
- *    (e.g. jogging on the spot at a traffic light: cadence stays 200+ SPM while GPS
- *    speed drops to ~0). Near-zero speed is therefore treated as "paused / in place"
- *    and the current activity is HELD, never flipped to walking.
+ * 3. ACCELEROMETER GAIT GATE (the v11 fix): we track each step's PEAK impact
+ *    magnitude (running has a flight phase → harder vertical impact than walking,
+ *    independent of forward speed). The walk and run impact levels are learned
+ *    ONLINE from moments when GPS speed is unambiguous (clearly walking / clearly
+ *    running), so no manual calibration is needed. A run→walk switch is only allowed
+ *    when the impact has ALSO dropped to walking level. If speed dips but impact is
+ *    still running-like (uphill jog), the activity HOLDS as running.
  *
- * 4. LEAKY-BUCKET DWELL (v10): evidence for a switch accumulates over time and
- *    DECAYS when the evidence reverses, instead of hard-resetting on every GPS
- *    wobble across the threshold. The v9 hard reset restarted an 18 s timer every
- *    time noisy speed poked back over the boundary, so a switch almost never
- *    committed near the walk/run boundary. The bucket commits once net evidence
- *    reaches STATE_DWELL_MS (8 s), riding through brief dips and noise.
+ * 4. JOGGING is a FULL activity state (not just a label). The walk↔run boundary is
+ *    still the hard problem (gait + speed); within the running family the speed is
+ *    split into JOGGING (slow / uphill) and RUNNING (fast) with its own hysteresis
+ *    band (JOG_RUN_ENTER / JOG_RUN_EXIT). Any change between the three states is
+ *    committed through the same leaky-bucket dwell, so jog↔run doesn't churn.
  *
- * 5. CADENCE FALLBACK: when no fresh GPS fix is available (e.g. indoor treadmill),
- *    fall back to cadence-vote majority so the app still classifies something.
+ * 5. IN-PLACE HOLD: filtered speed below LOW_WALK_MPS (0.8) = stopped / running in
+ *    place (e.g. at a light) → hold current activity, never flip to walking.
  *
- * Validated offline against two real sessions. On the brisk-walk session the
- * run→walk lag dropped from ~376/630 steps (v9) to ~50 steps (v10), matching all
- * six user-reported transitions including a brief mid-run walk while tying laces.
+ * 6. LEAKY-BUCKET DWELL (8 s): switch evidence accumulates and DECAYS when it
+ *    reverses, riding through brief GPS noise instead of hard-resetting.
+ *
+ * 7. CADENCE FALLBACK when no fresh GPS fix is available.
+ *
+ * The peak impact and learned baselines are written to the debug CSV so the gait
+ * thresholds can be validated/tuned against the next real session.
  */
 class StepDetector(private val listener: StepListener) : SensorEventListener {
 
@@ -67,6 +69,9 @@ class StepDetector(private val listener: StepListener) : SensorEventListener {
         val dwellRequiredMs: Long,
         val cadenceRunVotes: Int,
         val cadenceWalkVotes: Int,
+        val recentImpact: Double,
+        val walkImpactBase: Double?,
+        val runImpactBase: Double?,
         val decisionReason: String,
         val previousActivity: ActivityType,
         val currentActivity: ActivityType
@@ -109,6 +114,23 @@ class StepDetector(private val listener: StepListener) : SensorEventListener {
     private val VOTES_TO_RUN  = 8
     private val VOTES_TO_WALK = 6
     private val classVotes    = ArrayDeque<ActivityType>(VOTE_WINDOW)
+
+    // ── Accelerometer gait feature (peak vertical impact per step) ────────────
+    // Running has a flight phase → harder landing impact than walking, independent
+    // of forward speed. We take the median peak magnitude over a short window and
+    // learn the user's walk vs run impact levels online from unambiguous GPS speeds.
+    private val PEAK_WINDOW = 8
+    private val peakMags    = ArrayDeque<Float>(PEAK_WINDOW)
+    private var recentImpact = 0.0
+
+    private val IMPACT_ALPHA       = 0.08   // EWMA rate for the learned baselines
+    private val WALK_CONFIDENT_MPS = 1.2    // clearly walking → learn walk impact
+    private val RUN_CONFIDENT_MPS  = 2.3    // clearly running → learn run impact
+    private val MIN_IMPACT_RATIO   = 1.25   // run baseline must exceed walk × this to trust gait
+    private var walkImpactEwma = 0.0
+    private var runImpactEwma  = 0.0
+    private var walkImpactSeen = false
+    private var runImpactSeen  = false
 
     // ── GPS speed Kalman filter (primary signal) ──────────────────────────────
     // Random-walk model:  predict P += Q ; gain K = P/(P+R) ; x += K(z−x) ; P = (1−K)P
@@ -153,9 +175,12 @@ class StepDetector(private val listener: StepListener) : SensorEventListener {
     }
 
     // ── Classification thresholds (m/s on the filtered speed) ─────────────────
-    private val RUN_ENTER_MPS = 1.9    // walk → run above this (sustained)
-    private val RUN_EXIT_MPS  = 1.7    // run → walk below this (sustained) …
+    private val RUN_ENTER_MPS = 1.9    // walk → jog above this (sustained)
+    private val RUN_EXIT_MPS  = 1.7    // jog/run → walk below this (sustained) …
     private val LOW_WALK_MPS  = 0.8    // … but above this. Below = in-place/paused → HOLD
+    // Jog ↔ run split inside the running family (hysteresis avoids churn near the line).
+    private val JOG_RUN_ENTER_MPS = 2.3   // jog → run above this
+    private val JOG_RUN_EXIT_MPS  = 2.0   // run → jog below this
     private val STATE_DWELL_MS = 8_000L
     private val DWELL_DECAY    = 1.0   // leaky-bucket: counter-evidence drains at this × dt
 
@@ -179,6 +204,23 @@ class StepDetector(private val listener: StepListener) : SensorEventListener {
     private val walkVoteCount: Int get() = classVotes.count { it == ActivityType.WALKING }
 
     private val filteredGpsSpeed: Double? get() = if (kalmanInitialised) kalmanX else null
+
+    /** True once both walk and run impact baselines are learned and well separated. */
+    private val gaitSeparationReady: Boolean
+        get() = walkImpactSeen && runImpactSeen && runImpactEwma > walkImpactEwma * MIN_IMPACT_RATIO
+
+    /** Current step's impact sits in the running half of the learned walk↔run range. */
+    private val gaitSaysRunning: Boolean
+        get() = gaitSeparationReady && recentImpact >= (walkImpactEwma + runImpactEwma) / 2.0
+
+    private fun isRunningFamily(a: ActivityType) =
+        a == ActivityType.JOGGING || a == ActivityType.RUNNING
+
+    /** Within the running family, pick JOGGING vs RUNNING by speed with hysteresis. */
+    private fun runningTierFor(current: ActivityType, filtered: Double): ActivityType = when (current) {
+        ActivityType.RUNNING -> if (filtered < JOG_RUN_EXIT_MPS) ActivityType.JOGGING else ActivityType.RUNNING
+        else                 -> if (filtered >= JOG_RUN_ENTER_MPS) ActivityType.RUNNING else ActivityType.JOGGING
+    }
 
     // ── SensorEventListener ───────────────────────────────────────────────────
 
@@ -206,16 +248,22 @@ class StepDetector(private val listener: StepListener) : SensorEventListener {
         } else if (rising && lastMag > STEP_THRESHOLD) {
             rising = false
             val gap = wallMs - lastStepWallMs
-            if (gap >= MIN_STEP_MS) registerStep(wallMs, gap)
+            // lastMag is the peak of the just-finished upswing = this step's impact.
+            if (gap >= MIN_STEP_MS) registerStep(wallMs, gap, lastMag)
         } else {
             rising = false
         }
     }
 
-    private fun registerStep(wallMs: Long, intervalMs: Long) {
+    private fun registerStep(wallMs: Long, intervalMs: Long, peakMag: Float) {
         lastStepWallMs = wallMs
         if (stepIntervals.size >= INTERVAL_WINDOW) stepIntervals.removeFirst()
         stepIntervals.addLast(intervalMs)
+
+        // Rolling median peak impact = the gait feature.
+        if (peakMags.size >= PEAK_WINDOW) peakMags.removeFirst()
+        peakMags.addLast(peakMag)
+        recentImpact = peakMags.sorted().let { it[it.size / 2] }.toDouble()
 
         val spm = currentSpm
         val cadenceVote = if (spm >= CLASSIFY_SPM) ActivityType.RUNNING else ActivityType.WALKING
@@ -225,6 +273,20 @@ class StepDetector(private val listener: StepListener) : SensorEventListener {
         val gpsAge       = (wallMs - latestGpsTimeMs).coerceAtLeast(0L)
         val haveFreshGps = kalmanInitialised && gpsAge <= GPS_STALE_MS
         val filtered     = filteredGpsSpeed
+
+        // Learn the user's walk vs run impact levels from unambiguous GPS speeds.
+        if (haveFreshGps && filtered != null && recentImpact > 0.0) {
+            when {
+                filtered < WALK_CONFIDENT_MPS -> {
+                    walkImpactEwma = if (walkImpactSeen) walkImpactEwma + IMPACT_ALPHA * (recentImpact - walkImpactEwma) else recentImpact
+                    walkImpactSeen = true
+                }
+                filtered > RUN_CONFIDENT_MPS -> {
+                    runImpactEwma = if (runImpactSeen) runImpactEwma + IMPACT_ALPHA * (recentImpact - runImpactEwma) else recentImpact
+                    runImpactSeen = true
+                }
+            }
+        }
 
         val previousActivity = currentActivity
         var inPlaceHold = false
@@ -236,8 +298,11 @@ class StepDetector(private val listener: StepListener) : SensorEventListener {
         if (currentActivity == ActivityType.IDLE) {
             when {
                 haveFreshGps && filtered != null -> {
-                    currentActivity = if (filtered >= (RUN_ENTER_MPS + RUN_EXIT_MPS) / 2)
-                        ActivityType.RUNNING else ActivityType.WALKING
+                    currentActivity = when {
+                        filtered >= JOG_RUN_ENTER_MPS -> ActivityType.RUNNING
+                        filtered >= (RUN_ENTER_MPS + RUN_EXIT_MPS) / 2 -> ActivityType.JOGGING
+                        else -> ActivityType.WALKING
+                    }
                     stateCandidate = null
                     signalSource = "bootstrap_gps"
                     decisionReason = "bootstrap_gps"
@@ -247,8 +312,9 @@ class StepDetector(private val listener: StepListener) : SensorEventListener {
                     listener.onActivityChanged(currentActivity, wallMs)
                 }
                 classVotes.size >= 5 -> {
+                    // No GPS yet: cadence can only tell walk vs running-family → start as jogging.
                     currentActivity = if (runVoteCount > walkVoteCount)
-                        ActivityType.RUNNING else ActivityType.WALKING
+                        ActivityType.JOGGING else ActivityType.WALKING
                     stateCandidate = null
                     signalSource = "bootstrap_cadence"
                     decisionReason = "bootstrap_cadence"
@@ -265,24 +331,38 @@ class StepDetector(private val listener: StepListener) : SensorEventListener {
         if (currentActivity != ActivityType.IDLE) {
             if (haveFreshGps && filtered != null) {
                 if (filtered < LOW_WALK_MPS) {
-                    inPlaceHold = currentActivity == ActivityType.RUNNING
+                    inPlaceHold = isRunningFamily(currentActivity)
                     stateCandidate = null
                     desired = currentActivity
                     decisionReason = if (inPlaceHold) "hold_in_place" else "hold_paused"
                 } else {
                     desired = when (currentActivity) {
-                        ActivityType.WALKING -> if (filtered > RUN_ENTER_MPS) ActivityType.RUNNING else ActivityType.WALKING
-                        ActivityType.RUNNING -> if (filtered < RUN_EXIT_MPS)  ActivityType.WALKING else ActivityType.RUNNING
-                        else -> currentActivity
+                        ActivityType.WALKING ->
+                            if (filtered > RUN_ENTER_MPS) runningTierFor(ActivityType.WALKING, filtered)
+                            else ActivityType.WALKING
+                        // Running family (JOGGING / RUNNING):
+                        else -> {
+                            // Speed says walk — but only believe it if the GAIT also dropped to
+                            // walking level. Running-like impact at low speed = uphill / slow jog,
+                            // so stay in the running family (the v11 fix for the false walk blips).
+                            if (filtered < RUN_EXIT_MPS && !gaitSaysRunning) ActivityType.WALKING
+                            else runningTierFor(currentActivity, filtered)
+                        }
                     }
-                    decisionReason = if (desired == currentActivity) "stable" else "dwell_pending"
+                    decisionReason = when {
+                        desired == currentActivity && isRunningFamily(currentActivity) &&
+                            filtered < RUN_EXIT_MPS && gaitSaysRunning -> "hold_gait_jog"
+                        desired == currentActivity -> "stable"
+                        else -> "dwell_pending"
+                    }
                 }
             } else {
                 signalSource = "cadence_fallback"
+                // Without GPS, cadence can only separate walk vs running-family (not jog
+                // vs run), so running-family is represented as JOGGING and held as-is.
                 desired = when (currentActivity) {
-                    ActivityType.WALKING -> if (runVoteCount  >= VOTES_TO_RUN)  ActivityType.RUNNING else ActivityType.WALKING
-                    ActivityType.RUNNING -> if (walkVoteCount >= VOTES_TO_WALK) ActivityType.WALKING else ActivityType.RUNNING
-                    else -> currentActivity
+                    ActivityType.WALKING -> if (runVoteCount  >= VOTES_TO_RUN)  ActivityType.JOGGING else ActivityType.WALKING
+                    else                 -> if (walkVoteCount >= VOTES_TO_WALK) ActivityType.WALKING else currentActivity
                 }
                 decisionReason = if (desired == currentActivity) "stable_cadence" else "dwell_pending_cadence"
             }
@@ -357,6 +437,9 @@ class StepDetector(private val listener: StepListener) : SensorEventListener {
             dwellRequiredMs = STATE_DWELL_MS,
             cadenceRunVotes = runVoteCount,
             cadenceWalkVotes = walkVoteCount,
+            recentImpact = recentImpact,
+            walkImpactBase = if (walkImpactSeen) walkImpactEwma else null,
+            runImpactBase = if (runImpactSeen) runImpactEwma else null,
             decisionReason = decisionReason,
             previousActivity = prevActivity,
             currentActivity = currentActivity
@@ -373,5 +456,8 @@ class StepDetector(private val listener: StepListener) : SensorEventListener {
         stateCandidate = null; switchAccumMs = 0.0
         kalmanInitialised = false; kalmanX = 0.0; kalmanP = 1.0; lastKalmanGain = null
         latestGpsRawSpeedMps = null; latestGpsTimeMs = 0L
+        peakMags.clear(); recentImpact = 0.0
+        walkImpactEwma = 0.0; runImpactEwma = 0.0
+        walkImpactSeen = false; runImpactSeen = false
     }
 }

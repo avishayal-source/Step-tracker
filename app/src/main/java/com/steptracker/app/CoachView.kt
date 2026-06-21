@@ -1,15 +1,24 @@
 package com.steptracker.app
 
+import android.app.DatePickerDialog
 import android.content.Context
 import android.graphics.Color
+import android.view.Gravity
 import android.view.View
 import android.widget.EditText
+import android.widget.LinearLayout
+import android.widget.NumberPicker
 import android.widget.RadioButton
 import android.widget.RadioGroup
 import android.widget.TextView
 import android.widget.Toast
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import com.google.android.material.button.MaterialButton
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Date
+import java.util.Locale
 
 /**
  * Controller for the "Goal" tab (the AI Goal Coach). Collects the user's goal and
@@ -22,6 +31,15 @@ class CoachView(
     private val root: View
 ) {
     private val prefs = activity.getSharedPreferences("coach_prefs", Context.MODE_PRIVATE)
+    private val planStore = TrainingPlanStore(activity)
+
+    /** Invoked after the user approves a plan, so the host can surface today's workout. */
+    var onPlanActivated: (() -> Unit)? = null
+
+    // Last evaluation, kept so "Approve" can build a dated plan from it.
+    private var lastResult: RunPlanCoach.Result? = null
+    private var lastProfile: RunPlanCoach.Profile? = null
+    private var lastGoal: RunPlanCoach.Goal? = null
 
     private lateinit var etDistance: EditText
     private lateinit var etWeeks: EditText
@@ -41,6 +59,8 @@ class CoachView(
     private lateinit var tvRationale: TextView
     private lateinit var tvCautions: TextView
     private lateinit var tvPlan: TextView
+    private lateinit var btnApprove: MaterialButton
+    private lateinit var tvPlanStatus: TextView
 
     fun setup() {
         etDistance   = root.findViewById(R.id.coachTargetDistance)
@@ -61,9 +81,24 @@ class CoachView(
         tvRationale = root.findViewById(R.id.coachRationale)
         tvCautions  = root.findViewById(R.id.coachCautions)
         tvPlan      = root.findViewById(R.id.coachPlan)
+        btnApprove  = root.findViewById(R.id.coachBtnApprove)
+        tvPlanStatus = root.findViewById(R.id.coachPlanStatus)
 
         restoreInputs()
+        showActivePlanStatus()
         btnEvaluate.setOnClickListener { evaluate() }
+        btnApprove.setOnClickListener { askApproval() }
+    }
+
+    /** If a plan is already active, show its next-workout status at the top of results. */
+    private fun showActivePlanStatus() {
+        val plan = planStore.load() ?: return
+        val next = planStore.nextWorkout(plan)
+        tvPlanStatus.visibility = View.VISIBLE
+        tvPlanStatus.text = if (next != null)
+            "📅 Active plan: ${plan.goalLabel}\nNext: ${next.title} on ${next.dateLabel}"
+        else
+            "📅 Active plan: ${plan.goalLabel}\nAll scheduled workouts are complete — great job!"
     }
 
     private fun evaluate() {
@@ -112,7 +147,11 @@ class CoachView(
         )
 
         saveInputs()
-        render(RunPlanCoach.evaluate(profile, goal))
+        lastProfile = profile
+        lastGoal = goal
+        val result = RunPlanCoach.evaluate(profile, goal)
+        lastResult = result
+        render(result)
     }
 
     private fun render(r: RunPlanCoach.Result) {
@@ -153,6 +192,102 @@ class CoachView(
     }
 
     private fun fmt(v: Double): String = if (v >= 10) "%.0f".format(v) else "%.1f".format(v)
+
+    // ── Approval → schedule the plan ───────────────────────────────────────────
+    private fun askApproval() {
+        val result = lastResult ?: run {
+            Toast.makeText(activity, "Evaluate a goal first", Toast.LENGTH_SHORT).show(); return
+        }
+        if (result.plan.isEmpty()) {
+            Toast.makeText(activity, "No plan to schedule", Toast.LENGTH_SHORT).show(); return
+        }
+
+        val dp = activity.resources.displayMetrics.density
+        fun pad(v: Int) = (v * dp).toInt()
+
+        // Start date defaults to tomorrow; user can pick another via DatePickerDialog.
+        val chosenDate = Calendar.getInstance().apply {
+            add(Calendar.DAY_OF_MONTH, 1)
+            set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
+        }
+        val dateFmt = SimpleDateFormat("EEE, d MMM yyyy", Locale.getDefault())
+
+        val container = LinearLayout(activity).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(pad(20), pad(8), pad(20), pad(8))
+        }
+
+        container.addView(label("Start date"))
+        val dateBtn = MaterialButton(activity).apply {
+            text = dateFmt.format(chosenDate.time)
+            setOnClickListener {
+                DatePickerDialog(
+                    activity,
+                    { _, y, m, d ->
+                        chosenDate.set(y, m, d, 0, 0, 0); chosenDate.set(Calendar.MILLISECOND, 0)
+                        text = dateFmt.format(chosenDate.time)
+                    },
+                    chosenDate.get(Calendar.YEAR), chosenDate.get(Calendar.MONTH), chosenDate.get(Calendar.DAY_OF_MONTH)
+                ).apply { datePicker.minDate = System.currentTimeMillis() }.show()
+            }
+        }
+        container.addView(dateBtn)
+
+        container.addView(label("Warmup walk before each workout (minutes)"))
+        val warmupPicker = NumberPicker(activity).apply { minValue = 2; maxValue = 5; value = 3 }
+        container.addView(warmupPicker)
+
+        container.addView(label("Cooldown walk after each workout (minutes)"))
+        val cooldownPicker = NumberPicker(activity).apply { minValue = 2; maxValue = 5; value = 3 }
+        container.addView(cooldownPicker)
+
+        AlertDialog.Builder(activity)
+            .setTitle("Approve & schedule plan")
+            .setMessage("I'll put dated workouts in your Schedule tab and remind you the evening before each one. On each workout day, that day's session loads automatically.")
+            .setView(container)
+            .setPositiveButton("Schedule it") { _, _ ->
+                activatePlan(result, chosenDate.timeInMillis, warmupPicker.value, cooldownPicker.value)
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun label(text: String): TextView = TextView(activity).apply {
+        this.text = text
+        setTextColor(Color.parseColor("#8A90B8"))
+        textSize = 12f
+        gravity = Gravity.START
+        val dp = activity.resources.displayMetrics.density
+        setPadding(0, (10 * dp).toInt(), 0, (2 * dp).toInt())
+    }
+
+    private fun activatePlan(result: RunPlanCoach.Result, startMidnightMs: Long, warmupMin: Int, cooldownMin: Int) {
+        val profile = lastProfile ?: return
+        val goal = lastGoal ?: return
+
+        // Replace any previous plan: cancel its reminders first.
+        planStore.load()?.let { WorkoutReminderReceiver.cancelAll(activity, it) }
+
+        val plan = PlanScheduler.generate(result, profile, goal, startMidnightMs, warmupMin, cooldownMin)
+        planStore.save(plan)
+        WorkoutReminderReceiver.scheduleAll(activity, plan)
+
+        showActivePlanStatus()
+
+        val first = plan.workouts.firstOrNull()
+        AlertDialog.Builder(activity)
+            .setTitle("✅ Plan scheduled")
+            .setMessage(
+                "${plan.workouts.size} workouts added to your Schedule tab over ${result.plan.size} weeks.\n\n" +
+                "Each includes a ${warmupMin}-min warmup walk and a ${cooldownMin}-min cooldown walk.\n\n" +
+                (first?.let { "First workout: ${it.title} on ${it.dateLabel}.\n\n" } ?: "") +
+                "I'll remind you at 6 PM the day before each session. Today's workout loads into the Schedule tab automatically on its day."
+            )
+            .setPositiveButton("Go to Schedule") { _, _ -> onPlanActivated?.invoke() }
+            .setNegativeButton("OK", null)
+            .show()
+    }
 
     // ── Persistence ──────────────────────────────────────────────────────────
     private fun saveInputs() {

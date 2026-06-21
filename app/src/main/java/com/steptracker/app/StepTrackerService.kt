@@ -97,8 +97,8 @@ class StepTrackerService : Service(), StepDetector.StepListener {
     var totalSteps = 0;       private set
     val activityPeriods       = mutableListOf<ActivityPeriod>()
     var currentPeriod: ActivityPeriod? = null; private set
-    var walkSteps = 0;  var runSteps = 0
-    var walkDistM = 0.0; var runDistM = 0.0
+    var walkSteps = 0;  var runSteps = 0;  var jogSteps = 0
+    var walkDistM = 0.0; var runDistM = 0.0; var jogDistM = 0.0
     var sessionStartMs = 0L;  private set
 
     // FIX #5: guard so history is saved exactly once per session
@@ -224,7 +224,7 @@ class StepTrackerService : Service(), StepDetector.StepListener {
             historySaved = true
             saveWorkoutToHistory()
         }
-        updateNotification("Stopped – $totalSteps steps · ${formatDist(walkDistM + runDistM)}")
+        updateNotification("Stopped – $totalSteps steps · ${formatDist(walkDistM + jogDistM + runDistM)}")
         onUpdateListener?.invoke()
         closeClassifierDebugLog()
         stopForeground(STOP_FOREGROUND_DETACH)
@@ -232,8 +232,8 @@ class StepTrackerService : Service(), StepDetector.StepListener {
 
     fun resetData() {
         if (isTracking) return
-        totalSteps = 0; walkSteps = 0; runSteps = 0
-        walkDistM = 0.0; runDistM = 0.0; historySaved = false
+        totalSteps = 0; walkSteps = 0; runSteps = 0; jogSteps = 0
+        walkDistM = 0.0; runDistM = 0.0; jogDistM = 0.0; historySaved = false
         activityPeriods.clear(); currentPeriod = null; lastGpsLocation = null
         onUpdateListener?.invoke()
     }
@@ -242,15 +242,18 @@ class StepTrackerService : Service(), StepDetector.StepListener {
 
     private fun saveWorkoutToHistory() {
         val walkDurMs = activityPeriods.filter { it.type == ActivityType.WALKING }.sumOf { it.durationMs }
-        val runDurMs  = activityPeriods.filter { it.type == ActivityType.RUNNING  }.sumOf { it.durationMs }
+        val jogDurMs  = activityPeriods.filter { it.type == ActivityType.JOGGING }.sumOf { it.durationMs }
+        val runDurMs  = activityPeriods.filter { it.type == ActivityType.RUNNING }.sumOf { it.durationMs }
+        // History keeps a walk/run split (no DB migration); jogging is part of the
+        // running family, so it folds into the run totals here.
         workoutHistory.save(WorkoutRecord(
             dateMs         = sessionStartMs,
             walkSteps      = walkSteps,
-            runSteps       = runSteps,
+            runSteps       = runSteps + jogSteps,
             walkDistM      = walkDistM,
-            runDistM       = runDistM,
+            runDistM       = runDistM + jogDistM,
             walkDurationMs = walkDurMs,
-            runDurationMs  = runDurMs
+            runDurationMs  = runDurMs + jogDurMs
         ))
     }
 
@@ -332,6 +335,9 @@ class StepTrackerService : Service(), StepDetector.StepListener {
             dwellRequiredMs = 0L,
             cadenceRunVotes = 0,
             cadenceWalkVotes = 0,
+            recentImpact = 0.0,
+            walkImpactBase = null,
+            runImpactBase = null,
             decisionReason = "period_open:${prev?.type ?: ActivityType.IDLE}->$newActivity " +
                 "closed_steps=$closedSteps closed_dur_ms=$closedDurMs period_count=${activityPeriods.size}",
             previousActivity = prev?.type ?: ActivityType.IDLE,
@@ -360,6 +366,9 @@ class StepTrackerService : Service(), StepDetector.StepListener {
             dwellRequiredMs = sample.dwellRequiredMs,
             cadenceRunVotes = sample.cadenceRunVotes,
             cadenceWalkVotes = sample.cadenceWalkVotes,
+            recentImpact = sample.recentImpact,
+            walkImpactBase = sample.walkImpactBase,
+            runImpactBase = sample.runImpactBase,
             decisionReason = sample.decisionReason,
             previousActivity = sample.previousActivity,
             currentActivity = sample.currentActivity
@@ -384,6 +393,9 @@ class StepTrackerService : Service(), StepDetector.StepListener {
         dwellRequiredMs: Long,
         cadenceRunVotes: Int,
         cadenceWalkVotes: Int,
+        recentImpact: Double,
+        walkImpactBase: Double?,
+        runImpactBase: Double?,
         decisionReason: String,
         previousActivity: ActivityType,
         currentActivity: ActivityType
@@ -410,14 +422,19 @@ class StepTrackerService : Service(), StepDetector.StepListener {
                     dwellRequiredMs,
                     cadenceRunVotes,
                     cadenceWalkVotes,
+                    "%.2f".format(Locale.US, recentImpact),
+                    walkImpactBase?.let { "%.2f".format(Locale.US, it) } ?: "",
+                    runImpactBase?.let { "%.2f".format(Locale.US, it) } ?: "",
                     decisionReason.replace(',', ';'),
                     previousActivity,
                     currentActivity,
                     currentPeriod?.type ?: ActivityType.IDLE,
                     walkSteps,
+                    jogSteps,
                     runSteps,
                     totalSteps,
                     "%.2f".format(Locale.US, walkDistM),
+                    "%.2f".format(Locale.US, jogDistM),
                     "%.2f".format(Locale.US, runDistM),
                     gpsAvailable
                 ).joinToString(",")
@@ -444,9 +461,11 @@ class StepTrackerService : Service(), StepDetector.StepListener {
         // NOTE: currentPeriod is already inside activityPeriods (added in openNewPeriod).
         // Do NOT add listOfNotNull(currentPeriod) — that was double-counting the live
         // period the entire session, causing the displayed distance to be ~2× too high.
-        walkSteps = 0; runSteps = 0; walkDistM = 0.0; runDistM = 0.0
+        walkSteps = 0; runSteps = 0; jogSteps = 0
+        walkDistM = 0.0; runDistM = 0.0; jogDistM = 0.0
         for (p in activityPeriods) when (p.type) {
             ActivityType.WALKING -> { walkSteps += p.steps; walkDistM += p.distanceMeters }
+            ActivityType.JOGGING -> { jogSteps  += p.steps; jogDistM  += p.distanceMeters }
             ActivityType.RUNNING -> { runSteps  += p.steps; runDistM  += p.distanceMeters }
             else -> {}
         }
@@ -464,9 +483,12 @@ class StepTrackerService : Service(), StepDetector.StepListener {
                     "wall_time_ms,session_elapsed_ms,event,step_number,interval_ms,spm," +
                         "raw_gps_mps,filtered_gps_mps,kalman_gain,gps_age_ms,in_place_hold," +
                         "signal_source,desired_activity,candidate,dwell_ms,dwell_required_ms," +
-                        "cadence_run_votes,cadence_walk_votes,decision_reason," +
+                        "cadence_run_votes,cadence_walk_votes," +
+                        "recent_impact,walk_impact_base,run_impact_base," +
+                        "decision_reason," +
                         "previous_activity,current_activity," +
-                        "current_period,walk_steps,run_steps,total_steps,walk_dist_m,run_dist_m," +
+                        "current_period,walk_steps,jog_steps,run_steps,total_steps," +
+                        "walk_dist_m,jog_dist_m,run_dist_m," +
                         "gps_available\n"
                 )
                 flush()
@@ -486,11 +508,12 @@ class StepTrackerService : Service(), StepDetector.StepListener {
     private fun buildStatusText(): String {
         val act = when (stepDetector.currentActivity) {
             ActivityType.RUNNING -> "🏃 Running"
+            ActivityType.JOGGING -> "🏃 Jogging"
             ActivityType.WALKING -> "🚶 Walking"
             ActivityType.IDLE    -> "⏸ Idle"
         }
         val gps = if (gpsAvailable) " 📍" else ""
-        return "$act · $totalSteps steps · ${formatDist(walkDistM + runDistM)}$gps"
+        return "$act · $totalSteps steps · ${formatDist(walkDistM + jogDistM + runDistM)}$gps"
     }
 
     fun formatDist(m: Double) = Format.dist(m)

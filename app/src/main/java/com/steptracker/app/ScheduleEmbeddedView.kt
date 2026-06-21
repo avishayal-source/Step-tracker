@@ -23,6 +23,7 @@ class ScheduleEmbeddedView(
     private lateinit var scheduleAdapter: ScheduleEditAdapter
     private lateinit var store: ScheduleStore
     private lateinit var runPersistence: ScheduleRunPersistence
+    private lateinit var planStore: TrainingPlanStore
 
     private lateinit var rvSchedule: RecyclerView
     private lateinit var tvTotalWalk: TextView
@@ -54,10 +55,15 @@ class ScheduleEmbeddedView(
         private set
     private var inPrepCountdown = false
 
+    // True when the currently loaded schedule is today's planned workout, so it can
+    // be marked done in the training plan once completed.
+    private var loadedFromPlanToday = false
+
     fun setup() {
         scheduleManager = ScheduleManager(this)
         store = ScheduleStore(activity)
         runPersistence = ScheduleRunPersistence(activity)
+        planStore = TrainingPlanStore(activity)
 
         rvSchedule      = root.findViewById(R.id.schedRvSchedule)
         tvTotalWalk     = root.findViewById(R.id.schedTvTotalWalk)
@@ -126,6 +132,29 @@ class ScheduleEmbeddedView(
         refreshTotals()
         pendingRestore = runPersistence.load() != null
         if (pendingRestore && isBound) tryRestoreRunningSchedule()
+    }
+
+    /**
+     * If the active training plan has a not-done workout for today, load its periods
+     * (warmup + main + cooldown) into the editor. Safe to call repeatedly: it does
+     * nothing while a schedule is running or when the editor already has periods,
+     * so it never clobbers the user's manual edits.
+     */
+    fun loadTodaysPlannedWorkout(showToastIfNone: Boolean = false) {
+        if (isRunning || inPrepCountdown) return
+        if (schedule.isNotEmpty()) return
+        val plan = planStore.load()
+        val today = plan?.let { planStore.todaysPendingWorkout(it) }
+        if (today == null) {
+            if (showToastIfNone) Toast.makeText(activity, "No workout scheduled for today", Toast.LENGTH_SHORT).show()
+            return
+        }
+        schedule.clear()
+        schedule.addAll(today.items.map { it.copy(state = ScheduleState.PENDING) })
+        scheduleAdapter.notifyDataSetChanged()
+        refreshTotals()
+        loadedFromPlanToday = true
+        Toast.makeText(activity, "📅 Loaded today's workout: ${today.title}", Toast.LENGTH_LONG).show()
     }
 
     /** Called when activity is destroyed — persist run state; do not cancel the schedule timer goal. */
@@ -198,6 +227,7 @@ class ScheduleEmbeddedView(
                 schedule.addAll(chosen.items.map { it.copy(state = ScheduleState.PENDING) })
                 scheduleAdapter.notifyDataSetChanged()
                 refreshTotals()
+                loadedFromPlanToday = false
                 Toast.makeText(activity, "Loaded: ${chosen.name}", Toast.LENGTH_SHORT).show()
             }
             .setNeutralButton("Delete…") { _, _ -> showDeleteDialog(saved) }
@@ -287,6 +317,10 @@ class ScheduleEmbeddedView(
             scheduleAdapter.setRunningMode(false); scheduleAdapter.setActiveIndex(-1)
             scheduleAdapter.notifyDataSetChanged()
             stopStepTracking()
+            if (loadedFromPlanToday) {
+                planStore.markTodayDone()
+                loadedFromPlanToday = false
+            }
             Toast.makeText(activity, "🎉 Schedule complete!", Toast.LENGTH_LONG).show()
         }
     }
