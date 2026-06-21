@@ -631,6 +631,17 @@ Start a tracking session to build your history."
                 android:lineSpacingMultiplier="1.5"
                 android:background="@drawable/bg_hero" />
 
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:padding="12dp"
+                android:text="@string/health_disclaimer"
+                android:textSize="11sp"
+                android:textColor="@color/text_secondary"
+                android:lineSpacingMultiplier="1.4"
+                android:background="@drawable/bg_surface_card" />
+
             <!-- Your goal -->
             <TextView
                 android:layout_width="wrap_content"
@@ -898,6 +909,17 @@ Start a tracking session to build your history."
                     android:textColor="@color/text_secondary"
                     android:lineSpacingMultiplier="1.4" />
             </LinearLayout>
+
+            <TextView
+                android:id="@+id/btnPrivacyPolicy"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_horizontal"
+                android:layout_marginTop="20dp"
+                android:padding="8dp"
+                android:text="@string/privacy_policy_link"
+                android:textSize="13sp"
+                android:textColor="@color/accent" />
 
         </LinearLayout>
     </ScrollView>

@@ -30,7 +30,7 @@ class CoachView(
     private val activity: AppCompatActivity,
     private val root: View
 ) {
-    private val prefs = activity.getSharedPreferences("coach_prefs", Context.MODE_PRIVATE)
+    private val prefs = SecurePrefs.open(activity, "coach_prefs")
     private val planStore = TrainingPlanStore(activity)
 
     /** Invoked after the user approves a plan, so the host can surface today's workout. */

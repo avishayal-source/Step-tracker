@@ -209,7 +209,10 @@ class StepDetector(private val listener: StepListener) : SensorEventListener {
     private val gaitSeparationReady: Boolean
         get() = walkImpactSeen && runImpactSeen && runImpactEwma > walkImpactEwma * MIN_IMPACT_RATIO
 
-    /** Current step's impact sits in the running half of the learned walk↔run range. */
+    /** Release builds omit classifier diagnostics (Play / privacy). */
+    private fun debugLog(msg: String) {
+        if (BuildConfig.DEBUG) Log.d("StepDebug", msg)
+    }
     private val gaitSaysRunning: Boolean
         get() = gaitSeparationReady && recentImpact >= (walkImpactEwma + runImpactEwma) / 2.0
 
@@ -306,7 +309,7 @@ class StepDetector(private val listener: StepListener) : SensorEventListener {
                     stateCandidate = null
                     signalSource = "bootstrap_gps"
                     decisionReason = "bootstrap_gps"
-                    Log.d("StepDebug", "bootstrap(gps) → $currentActivity  filt=%.2f".format(filtered))
+                    debugLog("bootstrap(gps) → $currentActivity  filt=%.2f".format(filtered))
                     emitDebug("bootstrap", wallMs, intervalMs, spm, filtered, false,
                         signalSource, currentActivity, 0L, decisionReason, previousActivity)
                     listener.onActivityChanged(currentActivity, wallMs)
@@ -318,7 +321,7 @@ class StepDetector(private val listener: StepListener) : SensorEventListener {
                     stateCandidate = null
                     signalSource = "bootstrap_cadence"
                     decisionReason = "bootstrap_cadence"
-                    Log.d("StepDebug", "bootstrap(cadence) → $currentActivity  spm=$spm")
+                    debugLog("bootstrap(cadence) → $currentActivity  spm=$spm")
                     emitDebug("bootstrap", wallMs, intervalMs, spm, filtered, false,
                         signalSource, currentActivity, 0L, decisionReason, previousActivity)
                     listener.onActivityChanged(currentActivity, wallMs)
@@ -390,7 +393,7 @@ class StepDetector(private val listener: StepListener) : SensorEventListener {
                     stateCandidate = null
                     switchAccumMs = 0.0
                     decisionReason = "switch_committed"
-                    Log.d("StepDebug", "SWITCH $beforeSwitch→$currentActivity  " +
+                    debugLog("SWITCH $beforeSwitch→$currentActivity  " +
                         "filt=${filtered?.let { "%.2f".format(it) } ?: "n/a"}  spm=$spm")
                     emitDebug("switch", wallMs, intervalMs, spm, filtered, inPlaceHold,
                         signalSource, desired, 0L, decisionReason, beforeSwitch)

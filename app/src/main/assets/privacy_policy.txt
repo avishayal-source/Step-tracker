@@ -1,0 +1,53 @@
+Y Walk — Privacy Policy
+Last updated: June 2026
+
+1. Overview
+Y Walk ("the app") is a fitness step tracker with optional AI Goal Coach features. This policy describes what data the app collects, how it is used, and your choices. The app is designed to work primarily on your device without sending your workout data to our servers.
+
+2. Data we collect (on your device only)
+• Activity data: step counts, walk/jog/run classification, session duration, estimated distance.
+• Location (optional): if you grant permission, GPS is used during active tracking to improve distance accuracy and classify pace. Coordinates are not stored as a route history; only aggregated session stats are saved.
+• Health profile (optional): age, sex, weight, height, running experience and goals you enter in the Goal Coach tab.
+• Training plans: schedules and reminders you approve in the Goal Coach.
+• Calibration: your walk and run stride lengths if you use calibration.
+• Workout history: summaries of completed sessions (steps, distance, duration by activity type).
+
+3. How data is used
+• To track workouts and show session statistics.
+• To generate on-device training plans via the Goal Coach rules engine.
+• To schedule local workout reminders on your device.
+• Debug logging (developer builds only): detailed classifier diagnostics may be written to app-private storage to improve the walk/run algorithm. Release builds do not create these logs.
+
+4. Data storage and security
+• All data stays on your device unless you explicitly export or share it.
+• Health profile and training plans are stored in encrypted preferences where supported by your device.
+• Workout history is stored in a local database on your device.
+• Cloud backup and device-to-device transfer of app data are disabled.
+• The app does not use the internet and does not transmit your data to us or third parties.
+
+5. Permissions
+• Activity recognition: count steps and detect walking vs running.
+• Location: optional; improves distance and pace classification during tracking.
+• Notifications: optional; workout reminders the day before scheduled sessions.
+You can deny optional permissions; core step counting still works without GPS or notifications.
+
+6. Third parties
+The current version does not integrate analytics, advertising, or cloud AI services. If this changes, we will update this policy before release.
+
+7. Children's privacy
+The app is not directed at children under 13. We do not knowingly collect personal information from children.
+
+8. Your rights
+Because data is stored locally, you control it:
+• Uninstalling the app removes its data from your device.
+• You may clear session data from the Tracking tab without deleting history.
+• Contact us (see below) for questions about data practices.
+
+9. Health disclaimer
+Goal Coach output is generated on-device from general training principles. It is not medical advice, diagnosis, or treatment. Consult a healthcare professional before starting a new exercise programme.
+
+10. Changes
+We may update this policy before commercial release. The "Last updated" date will change accordingly.
+
+11. Contact
+For privacy questions about Y Walk, contact the developer via the GitHub repository issue tracker or the email listed on the Google Play store listing.

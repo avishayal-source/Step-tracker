@@ -137,6 +137,9 @@ class MainActivity : AppCompatActivity() {
         coachView = CoachView(this, pageCoach)
         coachView.setup()
         coachView.onPlanActivated = { tabLayout.getTabAt(1)?.select() }
+        pageCoach.findViewById<View>(R.id.btnPrivacyPolicy).setOnClickListener {
+            startActivity(Intent(this, PrivacyPolicyActivity::class.java))
+        }
 
         tabLayout.addOnTabSelectedListener(object : TabLayout.OnTabSelectedListener {
             override fun onTabSelected(tab: TabLayout.Tab) {
@@ -219,8 +222,19 @@ class MainActivity : AppCompatActivity() {
             stopwatchHandler.removeCallbacks(stopwatchRunnable)
             updateTrackingUI()
         } else if (hasTrackingPerms()) startTrackingService()
-        else ActivityCompat.requestPermissions(this, allPerms(), 100)
+        else requestTrackingPermissions()
     }
+
+    /** Explain why each permission is needed before the system dialog (Play policy). */
+    private fun requestTrackingPermissions() {
+        AlertDialog.Builder(this)
+            .setTitle(R.string.permission_rationale_title)
+            .setMessage(R.string.permission_rationale_message)
+            .setPositiveButton(R.string.permission_rationale_continue) { _, _ ->
+                ActivityCompat.requestPermissions(this, allPerms(), 100)
+            }
+            .setNegativeButton(R.string.permission_rationale_cancel, null)
+            .show()
 
     private fun confirmReset() {
         val svc = service ?: return

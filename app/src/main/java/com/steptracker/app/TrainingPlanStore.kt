@@ -8,7 +8,7 @@ import org.json.JSONObject
  * helpers the Schedule tab uses to find / complete today's workout.
  */
 class TrainingPlanStore(context: Context) {
-    private val prefs = context.getSharedPreferences("training_plan", Context.MODE_PRIVATE)
+    private val prefs = SecurePrefs.open(context, "training_plan")
     private val KEY = "active_plan"
 
     fun load(): TrainingPlan? {

@@ -400,6 +400,7 @@ class StepTrackerService : Service(), StepDetector.StepListener {
         previousActivity: ActivityType,
         currentActivity: ActivityType
     ) {
+        if (!BuildConfig.DEBUG) return
         val writer = classifierDebugWriter ?: return
         try {
             writer.append(
@@ -472,9 +473,10 @@ class StepTrackerService : Service(), StepDetector.StepListener {
     }
 
     private fun openClassifierDebugLog() {
+        if (!BuildConfig.DEBUG) return
         closeClassifierDebugLog()
         try {
-            val dir = getExternalFilesDir("debug_logs") ?: File(filesDir, "debug_logs")
+            val dir = File(filesDir, "debug_logs")
             if (!dir.exists()) dir.mkdirs()
             val stamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date(sessionStartMs))
             classifierDebugFile = File(dir, "classifier_debug_$stamp.csv")
