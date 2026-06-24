@@ -1,0 +1,139 @@
+Y WALK — COMMERCIALIZATION MILESTONES
+=====================================
+Generated: June 2026
+Branch: pre-commercial
+Privacy policy: https://github.com/avishayal-source/Docs/blob/main/PRIVACY_POLICY.md
+
+
+WHERE YOU STAND TODAY
+---------------------
+DONE:
+  - App rebranded to Y Walk
+  - Core features: tracking (walk/jog/run), schedule, history/insights, Goal Coach
+  - Phase 1 security: R8 minify, encrypted coach/plan prefs, backup disabled,
+    debug logs gated in release, permission rationale, in-app privacy screen
+  - Public privacy policy in dedicated Docs repo (no app source code there)
+  - pre-commercial branch on GitHub
+
+NOT DONE YET:
+  - Release signing + first Play upload
+  - Store listing assets and copy
+  - Play Console compliance forms (Data safety, etc.)
+  - Product polish (onboarding, About screen, beta labels)
+  - Algorithm confidence validated on release builds
+  - Phase 2 security (delete all data, crash reporting)
+
+
+MILESTONE 1 — RELEASE ENGINEERING (1–2 days)
+--------------------------------------------
+Goal: produce a signed build Google will accept.
+
+  1. Create a release keystore (once; back up offline)
+     Android Studio → Build → Generate Signed Bundle/APK
+
+  2. Configure signing in the project
+     keystore.properties + build.gradle (gitignore the keystore and properties)
+
+  3. Build an Android App Bundle
+     .\gradlew.bat bundleRelease
+
+  4. Smoke-test the RELEASE build on your phone (not debug):
+     - Start/stop tracking
+     - GPS denied vs granted
+     - Notifications
+     - Goal Coach + plan approval
+     - History
+
+  5. Make Step-tracker repo Private on GitHub if you want source hidden
+     (Docs repo stays public for the privacy policy URL only)
+
+
+MILESTONE 2 — GOOGLE PLAY CONSOLE SETUP (2–3 days)
+--------------------------------------------------
+Goal: listing ready for Internal Testing (not production yet).
+
+  1. Create Play Developer account ($25 one-time) if needed
+
+  2. Create app with package name com.steptracker.app (permanent)
+
+  3. Complete required declarations:
+     - Privacy policy URL → Docs repo link above
+     - Data safety form (location during use, health/fitness on-device, not shared)
+     - Foreground service declaration (health + location while tracking)
+     - Content rating questionnaire
+     - Target audience (not for children under 13)
+     - Health apps form if prompted (on-device rules, not medical advice)
+
+  4. Store listing assets:
+     - 512×512 icon
+     - 1024×500 feature graphic
+     - 4–8 phone screenshots (Tracking, Schedule, History, Goal Coach)
+     - Short description (~80 chars)
+     - Full description (lead with “data stays on your device”)
+     - Support email (required)
+
+
+MILESTONE 3 — PRODUCT POLISH (1–2 weeks)
+----------------------------------------
+Goal: feel commercial, not like a dev build.
+
+  - First-launch onboarding (permissions, calibration, “estimates not medical”)
+  - About screen (version, support email, privacy link, health disclaimer)
+  - “Insights experimental” label on History tab
+  - Delete all my data (Phase 2 security / GDPR-friendly)
+  - Crash reporting (Firebase Crashlytics or similar) before closed testing
+  - Accessibility pass (content descriptions, contrast, touch targets)
+
+  ALGORITHM TRUST (biggest commercial risk):
+  - Run 5–10 real sessions on RELEASE builds
+  - Validate walk ↔ jog ↔ run on flat ground, uphill, traffic stops
+  - Do not call production-ready until you trust the classifier
+
+  Optional engineering before wide release:
+  - FusedLocationProviderClient (better GPS)
+  - Unit tests for classifier thresholds and distance math
+
+
+MILESTONE 4 — STAGED ROLLOUT (2–4 weeks)
+----------------------------------------
+Do NOT skip straight to production.
+
+  Internal Testing (you, 1–2 devices)
+      ↓ fix crashes, signing, permissions
+  Closed Testing (5–20 people you know)
+      ↓ walk-only, run-only, mixed, no-GPS, background tracking
+  Open Testing OR Production at 5–10%
+      ↓ monitor reviews + crashes
+  Full production
+
+  Closed tester checklist:
+  - Walk only / run only / walk→run→walk
+  - Uphill slow running (jogging tier)
+  - Deny location — still tracks?
+  - Lock screen / background 30+ minutes
+  - Goal Coach → approve plan → reminder next day
+
+
+BUSINESS DECISIONS (pick soon)
+------------------------------
+  1. Pricing: simplest v1 = free, no ads, no account
+  2. Regions: start English only, one country to limit support load
+  3. Positioning: “smart walk/run tracker with on-device coaching”
+     — NOT “AI doctor”
+  4. Repo visibility: private main repo + public Docs repo for legal pages
+
+
+SUGGESTED ORDER THIS MONTH
+--------------------------
+  Week 1: Signed release AAB + Internal Testing upload
+  Week 2: Play listing assets + Data safety form
+  Week 3: Onboarding + About + delete-data
+  Before public launch: Closed testing + classifier validation on release builds
+
+
+RECOMMENDED NEXT CODE TASKS
+---------------------------
+  1. Release signing config + bundleRelease verification
+  2. Onboarding flow + About screen
+  3. Delete all my data in Settings
+  4. Crashlytics before closed testing

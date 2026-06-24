@@ -1,0 +1,398 @@
+BOTTY — PERSONAL COACH ARCHITECTURE PLAN
+=======================================
+Y Walk · Tab: "Personal Coach - Botty"
+Branch target: pre-commercial (new feature branch recommended)
+Status: DESIGN ONLY — do not implement until approved
+
+Decisions locked in
+-------------------
+A. Rules + structured UI (no cloud LLM for plan logic)
+B. Goal types v1: Run distance · Daily/weekly steps · Couch-to-5K · Event date
+C. Active-plan UI: summary + mid-plan milestone + current program week + full plan on demand
+D. Reminders: day-before (configurable time) + same-day + permission hint if denied
+E. Lifecycle: done / skipped / partial (user confirms) / postponed
+   Actions: Repeat workout · Repeat week · Pause · Full re-plan from achieved status
+F. One active goal at a time
+G. Branding: "Personal Coach - Botty"
+
+
+1. WHAT "MODEL" TO USE
+----------------------
+You chose option A (rules engine). There is NO generative AI model in v1.
+
+Recommended "model" = layered deterministic engine:
+
+  ┌─────────────────────────────────────────────────────────┐
+  │  BottyCoach (facade)                                     │
+  │  - evaluateGoal() → CoachProposal                        │
+  │  - activatePlan() → ActivePlan                           │
+  │  - onWorkoutEvent() → CoachMessage + PlanPatch           │
+  └─────────────────────────────────────────────────────────┘
+           │                    │                    │
+           ▼                    ▼                    ▼
+  GoalPlanner (strategy)   PlanSummaryBuilder   PlanAdaptationEngine
+  - RunDistancePlanner     - one-liner          - skip / partial / postpone
+  - EventDatePlanner       - mid milestone      - repeat / pause / replan
+  - CouchTo5KPlanner       - current week view
+  - StepGoalPlanner
+
+Why NOT an LLM for v1:
+  - Product requirement: never output unsafe training advice (RunPlanCoach comment)
+  - Offline-first, no API cost, Play privacy story stays simple
+  - Adaptations are finite actions → rules map cleanly
+
+Future (v2+): optional LLM as COPY layer only — rephrases Botty messages, never
+invents weekly mileage. All numbers still come from BottyCoach.
+
+Implementation language: Kotlin objects + sealed classes (same style as RunPlanCoach).
+No ML model, no TFLite, no cloud API required for Botty v1.
+
+
+2. HIGH-LEVEL ARCHITECTURE
+--------------------------
+
+                    ┌──────────────────┐
+                    │   CoachTab UI    │
+                    │  (BottyView)     │
+                    └────────┬─────────┘
+                             │
+         ┌───────────────────┼───────────────────┐
+         ▼                   ▼                   ▼
+  ┌─────────────┐    ┌──────────────┐    ┌─────────────────┐
+  │ Intake mode │    │ Active plan  │    │ Adaptation sheet│
+  │ pick goal   │    │ mode         │    │ (Botty speaks)  │
+  └──────┬──────┘    └──────┬───────┘    └────────┬────────┘
+         │                  │                      │
+         └──────────────────┼──────────────────────┘
+                            ▼
+                   ┌─────────────────┐
+                   │   BottyCoach    │
+                   └────────┬────────┘
+                            │
+         ┌──────────────────┼──────────────────┐
+         ▼                  ▼                  ▼
+  GoalPlanner*      ActivePlanStore      WorkoutLifecycleMonitor
+  PlanScheduler     (encrypted prefs)    (dates vs done flags)
+  PlanSummaryBuilder
+  PlanAdaptationEngine
+  ReminderScheduler (extends existing)
+
+         ┌──────────────────┴──────────────────┐
+         ▼                                     ▼
+  ScheduleEmbeddedView                  WorkoutHistory (read-only v1)
+  (load today's workout)                (future: partial detection)
+
+
+3. DATA MODEL (extend / replace TrainingPlan)
+---------------------------------------------
+
+sealed class CoachGoalType {
+  RUN_DISTANCE      // target km + horizon weeks (+ optional pace)
+  EVENT_DATE        // target km + race date (horizon derived)
+  COUCH_TO_5K       // preset 8–10 week C25K curve
+  STEPS_DAILY       // e.g. 8_000 steps/day habit
+  STEPS_WEEKLY      // e.g. 50_000 steps/week
+}
+
+data class CoachGoal( ... )           // user intent + type-specific fields
+data class CoachProfile( ... )        // reuse RunPlanCoach.Profile fields
+
+data class CoachProposal(             // output of "Evaluate" before approval
+  verdict, headline, rationale, cautions,
+  summary: PlanSummary,               // NEW — short motivational text
+  midMilestone: MidMilestone?,         // NEW — e.g. week 5 → 6.5 km
+  weeks: List<WeekBlueprint>,          // engine output (not UI dump)
+  fullPlanText: String                 // for "View full plan" dialog only
+)
+
+data class PlanSummary(                 // shown by default
+  workoutsPerWeek: Int,
+  startLabel: String,                  // "5 km" or "run/walk intervals"
+  endLabel: String,                    // "10 km"
+  totalWeeks: Int,
+  oneLiner: String                     // generated sentence
+)
+
+data class MidMilestone(
+  weekNumber: Int,
+  label: String,                       // "6.5 km continuous" or "30 min run"
+  teaser: String                       // "By week 5 you'll run 6.5 km — halfway there!"
+)
+
+data class ActivePlan(                  // replaces / wraps TrainingPlan
+  goal: CoachGoal,
+  profile: CoachProfile,
+  startDateMs: Long,
+  status: PlanStatus,                  // ACTIVE | PAUSED
+  pausedUntilMs: Long?,
+  warmupMin, cooldownMin,
+  weeks: List<WeekBlueprint>,
+  workouts: List<PlannedWorkout>,      // dated instances (existing shape + extras)
+  reminderPrefs: ReminderPrefs,
+  adaptationLog: List<AdaptationEntry> // audit trail for Botty messages
+)
+
+enum class WorkoutOutcome {
+  PENDING, DONE, SKIPPED, PARTIAL_PENDING_USER, POSTPONED
+}
+
+// Extend PlannedWorkout:
+  var outcome: WorkoutOutcome
+  var postponedToMs: Long?
+  var originalDateMs: Long?            // if moved
+
+
+4. GOAL PLANNERS (strategy per type)
+------------------------------------
+
+Interface: GoalPlanner {
+  fun evaluate(profile, goal): CoachProposal
+  fun replanFromProgress(profile, goal, completedWorkouts, currentWeek): CoachProposal
+}
+
+RunDistancePlanner
+  - Wrap/refactor existing RunPlanCoach.evaluate + buildPlan
+  - Mid milestone: pick week at ~40–50% of plan where longRunKm is impressive
+    Example: 12-week 5→10 km plan → week 5 long run ≈ 6.5 km
+
+EventDatePlanner
+  - horizonWeeks = weeksUntil(eventDate)
+  - Same ramp rules as run distance; headline mentions race date
+
+CouchTo5KPlanner
+  - Fixed week table (run/walk intervals → 30 min continuous)
+  - Mid milestone: "Week 4 — run 20 minutes without walking"
+  - Reuse PlanScheduler beginner interval logic
+
+StepGoalPlanner (daily OR weekly)
+  - No RunPlanCoach mileage curve
+  - Week blueprint = step targets per day or per week
+  - Scheduled "workouts" = walk sessions to help hit target (optional)
+  - Completion v1: user marks day/week done OR manual check-in
+  - NOTE: all-day step counting is NOT in app today — v1 uses session
+    tracking + honest UX: "Track a walk to count toward today's goal"
+  - v1.5: optional daily step widget if ACTIVITY_RECOGNITION background allowed
+
+PlanScheduler (existing)
+  - Stays responsible for turning WeekBlueprint → dated PlannedWorkouts
+  - Called on activate, replan, repeat week, postpone (shift dates)
+
+
+5. PLAN SUMMARY & MID MILESTONE (your point C)
+----------------------------------------------
+
+PlanSummaryBuilder.oneLiner(example):
+  "3 workouts per week · start at 5 km in week 1 · reach 10 km by week 12"
+
+MidMilestonePicker algorithm (run distance):
+  1. Let W = total weeks, target = goal km, start = week-1 long run km
+  2. Pick milestoneWeek = round(W * 0.42)  // ~middle, feels motivational
+  3. milestoneKm = plan[milestoneWeek].longRunKm
+  4. teaser = "By week {milestoneWeek} you'll run {milestoneKm} km — you're
+     building real endurance."
+
+For C25K: milestone = first "20 min run" week
+For steps: milestone = "By week 3 you'll average 7,000 steps/day"
+For event: "Race day {date} — you'll be ready for {km} km"
+
+UI layout — Active plan mode (replaces scary wall of text):
+
+  ┌─────────────────────────────────────────────┐
+  │ 🤖 Botty                                     │
+  │ ✅ Realistic goal · 10 km in 12 weeks        │
+  ├─────────────────────────────────────────────┤
+  │ SUMMARY (always visible)                     │
+  │ 3×/week · 5 km → 10 km · 12 weeks           │
+  │ 🎯 By week 5 you'll run 6.5 km              │
+  ├─────────────────────────────────────────────┤
+  │ THIS WEEK — Program week 3                   │
+  │ • Tue Easy 4 km                              │
+  │ • Thu 3 km                                   │
+  │ • Sat Long 6 km                              │
+  │ [Start today's workout → Schedule tab]       │
+  ├─────────────────────────────────────────────┤
+  │ [View full plan]  [Change goal]  [Pause]     │
+  └─────────────────────────────────────────────┘
+
+Program week calculation:
+  programWeek = floor((today - startDate) / 7 days) + 1, clamped [1..totalWeeks]
+  Before startDate: show Week 1 preview only
+  After startDate: show workouts for programWeek only
+
+Intake mode hidden when ActivePlan.status == ACTIVE (collapsed behind "Change goal").
+
+
+6. REMINDERS (extend WorkoutReminderReceiver)
+---------------------------------------------
+
+Existing: day-before @ 18:00 fixed (REMINDER_HOUR)
+
+New: ReminderPrefs on ActivePlan
+  - dayBeforeEnabled: Boolean (default true)
+  - dayBeforeHour / minute (user picker, default 18:00)
+  - sameDayEnabled: Boolean (default true)
+  - sameDayHour / minute (default 08:00)
+
+WorkoutReminderReceiver changes:
+  - scheduleAll() schedules TWO alarms per workout (different requestCode offset)
+  - ACTION_REMIND_DAY_BEFORE vs ACTION_REMIND_SAME_DAY
+  - cancelAll() cancels both
+
+CoachTab / Settings snippet:
+  - If POST_NOTIFICATIONS denied → banner: "Botty can't remind you — enable
+    notifications in Settings"
+  - Link to app notification settings
+
+Reschedule reminders after: activate, postpone, pause, replan
+
+
+7. WORKOUT LIFECYCLE & ADAPTATIONS (your point E)
+-------------------------------------------------
+
+WorkoutLifecycleMonitor (daily check + on tab open):
+  For each workout where date < today AND outcome == PENDING:
+    → mark SKIPPED (internal)
+    → enqueue BottyMessage: "You missed Saturday's long run. What should we do?"
+
+PARTIAL flow (v1 — user adjudicated):
+  When user opens Schedule after a session with outcome unclear:
+    Botty alert: "Looks like you didn't finish the full workout. Count it?"
+    [Mark done] [Mark not done] [Repeat this workout]
+  (No automatic distance comparison in v1)
+
+POSTPONED:
+  User taps "Move" on a workout → pick new date within same program week
+  or next available slot → update dateMs, reschedule reminders
+
+Adaptation actions (PlanAdaptationEngine):
+
+  REPEAT_WORKOUT
+    - Clone same PlannedWorkout to next free day, mark original SKIPPED
+
+  REPEAT_WEEK
+    - Re-insert copy of current program week's workouts after this week
+    - Shift subsequent dates by 7 days OR insert without shifting (design choice:
+      recommend shift to avoid pile-up)
+
+  PAUSE
+    - status = PAUSED, pausedUntilMs = user date
+    - Cancel reminders; resume shifts all future dates by pause duration
+
+  FULL_REPLAN
+    - Call GoalPlanner.replanFromProgress():
+        startDistance = max(completed long runs) OR profile.currentLongestRunKm
+        remainingWeeks = original horizon - weeksCompleted + buffer
+    - Replace future workouts only; preserve completed history in adaptationLog
+    - User must confirm new proposal (mini approve flow)
+
+BottyMessage (UI):
+  - title, body, suggestedActions: List<AdaptationAction>
+  - Shown as card on Coach tab until dismissed or acted upon
+
+
+8. UI / NAVIGATION CHANGES
+--------------------------
+
+Tab label: "Personal Coach - Botty" (or shortened "Botty" on small screens)
+
+Replace CoachView with BottyView (or refactor CoachView):
+  States: INTAKE | PROPOSAL | ACTIVE | PAUSED
+
+Files touched (implementation phase):
+  - activity_main.xml (tab, pageCoach layout — two panels: intake vs active)
+  - CoachView.kt → BottyView.kt
+  - strings.xml (Botty copy)
+  - MainActivity tab indices unchanged
+
+Schedule tab integration (unchanged concept):
+  - loadTodaysPlannedWorkout() from ActivePlanStore
+  - onScheduleComplete() → mark outcome DONE
+
+
+9. PERSISTENCE
+--------------
+
+Rename conceptually: TrainingPlanStore → ActivePlanStore
+  - Migrate existing training_plan JSON → ActivePlan v2 schema
+  - Store ReminderPrefs, goal type, pause state
+
+coach_prefs → botty_prefs (goal intake fields + reminder settings)
+
+
+10. IMPLEMENTATION PHASES (recommended order)
+-----------------------------------------------
+
+Phase 1 — Presentation (no new goal types)
+  - PlanSummaryBuilder + MidMilestonePicker on existing RunPlanCoach output
+  - Active plan UI: summary + current week + "View full plan" dialog
+  - Tab rename Botty; intake vs active mode toggle
+  - Estimated: 2–3 days
+
+Phase 2 — Reminders++
+  - Configurable day-before + same-day; permission banner
+  - Estimated: 1 day
+
+Phase 3 — Goal types
+  - Event date planner (horizon from calendar)
+  - CouchTo5K preset planner
+  - Step goal planner (session-based v1)
+  - Goal type picker on intake
+  - Estimated: 4–5 days
+
+Phase 4 — Lifecycle & adaptations
+  - WorkoutOutcome on PlannedWorkout
+  - Skip detection + Botty message cards
+  - Partial user prompt
+  - Postpone + Repeat workout/week + Pause
+  - Estimated: 4–5 days
+
+Phase 5 — Full replan
+  - replanFromProgress() per goal type
+  - Confirm dialog + reminder reschedule
+  - Estimated: 2–3 days
+
+Phase 6 — Polish
+  - Botty personality strings (consistent voice)
+  - Empty states, edge cases (plan finished, pause expired)
+  - Estimated: 2 days
+
+Total rough estimate: 3–4 weeks part-time
+
+Suggested branch: feature/botty-coach from pre-commercial
+
+
+11. TESTING CHECKLIST
+---------------------
+- Approve plan → active mode shows summary not wall of text
+- Before start date → week 1 preview
+- After week 2 starts → UI shows week 2 only
+- Mid milestone text matches plan math for 5→10 km / 12 weeks
+- Miss workout → Botty skip message next open
+- Partial → user choice doesn't corrupt done counts
+- Postpone → reminders move
+- Pause 7 days → resume shifts plan
+- Replan → safer distances after skipped weeks
+- One active goal: starting new goal cancels old plan + reminders
+- Notifications denied → banner visible, no crash
+
+
+12. RISKS & MITIGATIONS
+-----------------------
+| Risk | Mitigation |
+|------|------------|
+| Step goals without all-day counter | Session-based + clear copy; defer background steps |
+| Repeat week shifts calendar mess | Central date-shifting helper in PlanScheduler |
+| Replan too aggressive | Same RunPlanCoach safety caps as initial plan |
+| UI complexity | Strict state machine: INTAKE/PROPOSAL/ACTIVE/PAUSED |
+| Scope creep (chat UI) | Defer free-text to v2; buttons only in v1 |
+
+
+13. WHAT NOT TO BUILD IN V1
+---------------------------
+- Cloud LLM / ChatGPT integration
+- Planned vs actual km auto-comparison
+- Multiple simultaneous goals
+- Social / coach sharing
+- Wear OS integration
+
+END OF DOCUMENT
