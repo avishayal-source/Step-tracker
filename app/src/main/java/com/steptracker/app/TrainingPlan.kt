@@ -95,13 +95,41 @@ data class TrainingPlan(
     val goalLabel: String,
     val warmupMin: Int,
     val cooldownMin: Int,
-    val workouts: List<PlannedWorkout>
+    val workouts: List<PlannedWorkout>,
+    val startDateMs: Long = 0L,
+    val summaryOneLiner: String = "",
+    val milestoneTeaser: String = "",
+    val totalWeeks: Int = 0
 ) {
+    private val maxProgramWeek: Int
+        get() = if (totalWeeks > 0) totalWeeks else workouts.maxOfOrNull { it.weekNumber } ?: 1
+
+    /** Program week 1..N from plan start; before start date returns 1 (preview week 1). */
+    fun displayWeek(now: Long = System.currentTimeMillis()): Int {
+        val start = effectiveStartMs()
+        if (now < start) return 1
+        val days = ((now - start) / 86_400_000L).toInt()
+        return (days / 7 + 1).coerceIn(1, maxProgramWeek)
+    }
+
+    fun workoutsForDisplayWeek(now: Long = System.currentTimeMillis()): List<PlannedWorkout> =
+        workouts.filter { it.weekNumber == displayWeek(now) }.sortedBy { it.dateMs }
+
+    fun effectiveStartMs(): Long =
+        if (startDateMs > 0L) startDateMs
+        else workouts.minOfOrNull { it.dateMs } ?: System.currentTimeMillis()
+
+    fun hasStarted(now: Long = System.currentTimeMillis()): Boolean = now >= effectiveStartMs()
+
     fun toJson(): JSONObject = JSONObject().apply {
         put("created", createdMs)
         put("goal", goalLabel)
         put("warmup", warmupMin)
         put("cooldown", cooldownMin)
+        put("start", startDateMs)
+        put("summary", summaryOneLiner)
+        put("milestone", milestoneTeaser)
+        put("totalWeeks", totalWeeks)
         val arr = JSONArray()
         workouts.forEach { arr.put(it.toJson()) }
         put("workouts", arr)
@@ -116,7 +144,11 @@ data class TrainingPlan(
                 goalLabel = o.getString("goal"),
                 warmupMin = o.optInt("warmup", 3),
                 cooldownMin = o.optInt("cooldown", 3),
-                workouts = workouts
+                workouts = workouts,
+                startDateMs = o.optLong("start", 0L),
+                summaryOneLiner = o.optString("summary", ""),
+                milestoneTeaser = o.optString("milestone", ""),
+                totalWeeks = o.optInt("totalWeeks", 0)
             )
         }
     }

@@ -30,7 +30,8 @@ object PlanScheduler {
         goal: RunPlanCoach.Goal,
         startMidnightMs: Long,
         warmupMin: Int,
-        cooldownMin: Int
+        cooldownMin: Int,
+        presentation: PlanSummaryBuilder.Presentation? = null
     ): TrainingPlan {
         val beginner = profile.currentLongestRunKm < 1.0
         val easyPaceMinPerKm = if (beginner) 9.0 else 7.5
@@ -91,7 +92,11 @@ object PlanScheduler {
             goalLabel = goalLabel,
             warmupMin = warmupMin,
             cooldownMin = cooldownMin,
-            workouts = workouts
+            workouts = workouts,
+            startDateMs = startMidnightMs,
+            summaryOneLiner = presentation?.oneLiner ?: "",
+            milestoneTeaser = presentation?.milestoneTeaser ?: "",
+            totalWeeks = presentation?.totalWeeks ?: result.plan.size
         )
     }
 

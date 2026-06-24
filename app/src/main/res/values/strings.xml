@@ -6,7 +6,16 @@
     <string name="privacy_policy_title">Privacy Policy</string>
     <string name="privacy_policy_link">Privacy Policy</string>
 
-    <string name="health_disclaimer">Not medical advice. The Goal Coach uses on-device rules based on general training principles. Consult a doctor before starting a new exercise programme. Stop if you feel pain, dizziness, or chest discomfort.</string>
+    <string name="botty_intro">🤖 Botty — your personal coach\nTell me your goal and a bit about you. I\'ll check if it\'s realistic and build a safe plan — never a risky one.</string>
+    <string name="botty_active_header">🤖 Active plan</string>
+    <string name="botty_this_week">THIS WEEK</string>
+    <string name="botty_week_preview">WEEK 1 PREVIEW</string>
+    <string name="botty_view_full_plan">View full plan</string>
+    <string name="botty_change_goal">Change goal</string>
+    <string name="botty_go_schedule">Open today in Schedule</string>
+    <string name="botty_plan_summary_label">YOUR PLAN AT A GLANCE</string>
+    <string name="botty_milestone_label">MILESTONE</string>
+    <string name="health_disclaimer">Not medical advice. Botty uses on-device rules based on general training principles. Consult a doctor before starting a new exercise programme. Stop if you feel pain, dizziness, or chest discomfort.</string>
 
     <string name="permission_rationale_title">Permissions needed</string>
     <string name="permission_rationale_message">Y Walk needs:\n\n• Activity recognition — to count steps and detect walking vs running.\n\n• Location (optional) — to measure distance more accurately while you track. Denying location still allows step-based tracking.\n\n• Notifications (optional) — for workout reminders if you use a training plan.\n\nYour workout data stays on this device and is not sent to our servers.</string>

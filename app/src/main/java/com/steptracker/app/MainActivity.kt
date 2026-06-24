@@ -149,6 +149,7 @@ class MainActivity : AppCompatActivity() {
                 pageCoach.visibility    = if (tab.position == 3) View.VISIBLE else View.GONE
                 if (tab.position == 1) scheduleView.loadTodaysPlannedWorkout()
                 if (tab.position == 2) updateHistoryUI()
+                if (tab.position == 3) coachView.onTabVisible()
             }
             override fun onTabUnselected(t: TabLayout.Tab?) {}
             override fun onTabReselected(t: TabLayout.Tab?) {}
@@ -235,6 +236,7 @@ class MainActivity : AppCompatActivity() {
             }
             .setNegativeButton(R.string.permission_rationale_cancel, null)
             .show()
+    }
 
     private fun confirmReset() {
         val svc = service ?: return

@@ -71,7 +71,7 @@
         <com.google.android.material.tabs.TabItem
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="🎯 Goal" />
+            android:text="🤖 Botty" />
     </com.google.android.material.tabs.TabLayout>
 
     <!-- ═══════════════════════════════════════ PAGE: TRACKING ═══ -->
@@ -620,12 +620,143 @@ Start a tracking session to build your history."
             android:padding="16dp"
             android:paddingBottom="40dp">
 
+            <!-- ══ Active plan (Botty) — shown when a plan is scheduled ══ -->
+            <LinearLayout
+                android:id="@+id/coachActivePanel"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:visibility="gone">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:padding="18dp"
+                    android:text="@string/botty_active_header"
+                    android:textSize="18sp"
+                    android:textColor="@color/text_primary"
+                    android:fontFamily="sans-serif-black"
+                    android:background="@drawable/bg_hero" />
+
+                <TextView
+                    android:id="@+id/tvBottyGoalLabel"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:padding="14dp"
+                    android:textSize="15sp"
+                    android:textColor="@color/text_primary"
+                    android:fontFamily="sans-serif-medium"
+                    android:background="@drawable/bg_surface_card" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:layout_marginBottom="6dp"
+                    android:text="@string/botty_plan_summary_label"
+                    android:textSize="12sp"
+                    android:letterSpacing="0.1"
+                    android:textColor="@color/text_secondary"
+                    android:fontFamily="sans-serif-medium" />
+
+                <TextView
+                    android:id="@+id/tvBottySummary"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:padding="14dp"
+                    android:textSize="14sp"
+                    android:textColor="@color/text_primary"
+                    android:lineSpacingMultiplier="1.45"
+                    android:background="@drawable/bg_surface_card" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="14dp"
+                    android:layout_marginBottom="6dp"
+                    android:text="@string/botty_milestone_label"
+                    android:textSize="12sp"
+                    android:letterSpacing="0.1"
+                    android:textColor="@color/text_secondary"
+                    android:fontFamily="sans-serif-medium" />
+
+                <TextView
+                    android:id="@+id/tvBottyMilestone"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:padding="14dp"
+                    android:textSize="14sp"
+                    android:textColor="@color/accent_cyan"
+                    android:lineSpacingMultiplier="1.45"
+                    android:background="@drawable/bg_surface_card" />
+
+                <TextView
+                    android:id="@+id/tvBottyWeekHeader"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="16dp"
+                    android:layout_marginBottom="6dp"
+                    android:text="@string/botty_this_week"
+                    android:textSize="12sp"
+                    android:letterSpacing="0.1"
+                    android:textColor="@color/text_secondary"
+                    android:fontFamily="sans-serif-medium" />
+
+                <TextView
+                    android:id="@+id/tvBottyWeekWorkouts"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:padding="14dp"
+                    android:textSize="13sp"
+                    android:textColor="@color/text_primary"
+                    android:lineSpacingMultiplier="1.5"
+                    android:background="@drawable/bg_surface_card" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnBottyGoSchedule"
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:layout_marginTop="14dp"
+                    android:text="@string/botty_go_schedule"
+                    android:textSize="14sp"
+                    app:cornerRadius="24dp"
+                    android:backgroundTint="@color/accent" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnBottyViewFullPlan"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:layout_marginTop="8dp"
+                    android:text="@string/botty_view_full_plan"
+                    android:textSize="14sp"
+                    app:cornerRadius="24dp"
+                    app:strokeColor="@color/accent" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnBottyChangeGoal"
+                    style="@style/Widget.MaterialComponents.Button.TextButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="4dp"
+                    android:text="@string/botty_change_goal"
+                    android:textColor="@color/text_secondary" />
+            </LinearLayout>
+
+            <!-- ══ Goal intake (hidden while active plan runs) ══ -->
+            <LinearLayout
+                android:id="@+id/coachIntakePanel"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
             <!-- Intro -->
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:padding="18dp"
-                android:text="🎯 AI Goal Coach\nTell me your goal and a bit about you. I'll check if it's realistic and build a safe, personalised plan — never a risky one."
+                android:text="@string/botty_intro"
                 android:textSize="13sp"
                 android:textColor="@color/text_primary"
                 android:lineSpacingMultiplier="1.5"
@@ -814,6 +945,8 @@ Start a tracking session to build your history."
                 app:cornerRadius="26dp"
                 android:backgroundTint="@color/accent" />
 
+            </LinearLayout>
+
             <TextView
                 android:id="@+id/coachPlanStatus"
                 android:layout_width="match_parent"
@@ -873,21 +1006,62 @@ Start a tracking session to build your history."
                     android:layout_height="wrap_content"
                     android:layout_marginTop="18dp"
                     android:layout_marginBottom="8dp"
-                    android:text="YOUR WEEKLY PLAN"
+                    android:text="@string/botty_plan_summary_label"
                     android:textSize="12sp"
                     android:letterSpacing="0.1"
                     android:textColor="@color/text_secondary"
                     android:fontFamily="sans-serif-medium" />
 
                 <TextView
-                    android:id="@+id/coachPlan"
+                    android:id="@+id/tvCoachSummary"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:padding="16dp"
+                    android:textSize="14sp"
+                    android:textColor="@color/text_primary"
+                    android:lineSpacingMultiplier="1.45"
+                    android:background="@drawable/bg_surface_card" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="14dp"
+                    android:layout_marginBottom="8dp"
+                    android:text="@string/botty_milestone_label"
+                    android:textSize="12sp"
+                    android:letterSpacing="0.1"
+                    android:textColor="@color/text_secondary"
+                    android:fontFamily="sans-serif-medium" />
+
+                <TextView
+                    android:id="@+id/tvCoachMilestone"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:padding="16dp"
+                    android:textSize="14sp"
+                    android:textColor="@color/accent_cyan"
+                    android:lineSpacingMultiplier="1.45"
+                    android:background="@drawable/bg_surface_card" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnCoachViewFullPlan"
+                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                    android:layout_width="match_parent"
+                    android:layout_height="48dp"
+                    android:layout_marginTop="12dp"
+                    android:text="@string/botty_view_full_plan"
+                    android:textSize="14sp"
+                    app:cornerRadius="24dp"
+                    app:strokeColor="@color/accent" />
+
+                <TextView
+                    android:id="@+id/coachPlan"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:visibility="gone"
+                    android:padding="16dp"
                     android:textSize="13sp"
                     android:textColor="@color/text_primary"
-                    android:lineSpacingMultiplier="1.4"
-                    android:fontFamily="monospace"
                     android:background="@drawable/bg_surface_card" />
 
                 <com.google.android.material.button.MaterialButton
