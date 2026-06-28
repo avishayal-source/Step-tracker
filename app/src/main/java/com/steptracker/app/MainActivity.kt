@@ -90,6 +90,14 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // Legal consent gate — must accept Terms / Privacy / disclaimers first.
+        if (!LegalConsent.isAccepted(this)) {
+            startActivity(Intent(this, OnboardingActivity::class.java))
+            finish()
+            return
+        }
+
         setContentView(R.layout.activity_main)
         userPrefs      = UserPrefs(this)
         workoutHistory = WorkoutHistory(this)
@@ -138,7 +146,10 @@ class MainActivity : AppCompatActivity() {
         coachView.setup()
         coachView.onPlanActivated = { tabLayout.getTabAt(1)?.select() }
         pageCoach.findViewById<View>(R.id.btnPrivacyPolicy).setOnClickListener {
-            startActivity(Intent(this, PrivacyPolicyActivity::class.java))
+            startActivity(LegalDocActivity.privacy(this))
+        }
+        pageCoach.findViewById<View>(R.id.btnTermsOfService).setOnClickListener {
+            startActivity(LegalDocActivity.terms(this))
         }
 
         tabLayout.addOnTabSelectedListener(object : TabLayout.OnTabSelectedListener {

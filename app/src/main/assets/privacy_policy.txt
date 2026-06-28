@@ -2,7 +2,9 @@ Y Walk — Privacy Policy
 Last updated: June 2026
 
 1. Overview
-Y Walk ("the app") is a fitness step tracker with optional AI Goal Coach features. This policy describes what data the app collects, how it is used, and your choices. The app is designed to work primarily on your device without sending your workout data to our servers.
+Y Walk ("the app") is a fitness step tracker with an optional AI training coach ("Botty"). This policy describes what data the app collects, how it is used, and your choices. The app is designed to work primarily on your device without sending your workout data to our servers.
+
+Y Walk is a fitness and activity tracker that provides personalized training recommendations. It is not a medical device, is not intended for any medical purpose, and does not diagnose, treat, cure, or prevent any disease or health condition.
 
 2. Data we collect (on your device only)
 • Activity data: step counts, walk/jog/run classification, session duration, estimated distance.
@@ -44,7 +46,13 @@ Because data is stored locally, you control it:
 • Contact us (see below) for questions about data practices.
 
 9. Health disclaimer
-Goal Coach output is generated on-device from general training principles. It is not medical advice, diagnosis, or treatment. Consult a healthcare professional before starting a new exercise programme.
+This app is intended for informational and fitness purposes only. It is not a medical device and does not provide medical advice. Consult a qualified healthcare professional before beginning any exercise program, especially if you have a medical condition or experience symptoms such as chest pain, dizziness, or shortness of breath.
+
+9a. AI disclaimer
+The Botty coach generates recommendations automatically on your device. AI-generated recommendations are provided for informational purposes only and should not replace professional medical or fitness advice.
+
+9b. Terms of Service
+Your use of the app is also governed by our Terms of Service, which you accept when you first use the app.
 
 10. Changes
 We may update this policy before commercial release. The "Last updated" date will change accordingly.

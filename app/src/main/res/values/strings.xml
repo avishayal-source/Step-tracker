@@ -5,6 +5,28 @@
 
     <string name="privacy_policy_title">Privacy Policy</string>
     <string name="privacy_policy_link">Privacy Policy</string>
+    <string name="terms_title">Terms of Service</string>
+    <string name="terms_link">Terms of Service</string>
+
+    <!-- ══ Legal / consent (exact wording requested) ══ -->
+    <string name="not_medical_statement">Y Walk is a fitness and activity tracker that provides personalized training recommendations. It is not a medical device, is not intended for any medical purpose, and does not diagnose, treat, cure, or prevent any disease or health condition.</string>
+    <string name="health_disclaimer_full">This app is intended for informational and fitness purposes only. It is not a medical device and does not provide medical advice. Consult a qualified healthcare professional before beginning any exercise program, especially if you have a medical condition or experience symptoms such as chest pain, dizziness, or shortness of breath.</string>
+    <string name="ai_disclaimer">AI-generated recommendations are provided for informational purposes only and should not replace professional medical or fitness advice.</string>
+
+    <!-- ══ Onboarding ══ -->
+    <string name="onboarding_title">Welcome to Y Walk</string>
+    <string name="onboarding_subtitle">Before you start, please review and accept the following.</string>
+    <string name="onboarding_health_header">Health &amp; Safety Disclaimer</string>
+    <string name="onboarding_ai_header">AI Disclaimer</string>
+    <string name="onboarding_not_medical_header">Not a Medical App</string>
+    <string name="onboarding_legal_header">Terms &amp; Privacy</string>
+    <string name="onboarding_legal_body">Your workout data stays on your device. Please read the full documents before continuing.</string>
+    <string name="onboarding_permissions_header">Permissions we\u2019ll request</string>
+    <string name="onboarding_permissions_body">\u2022 Activity recognition \u2014 to count steps and detect walking vs running.\n\u2022 Notifications (optional) \u2014 for workout reminders if you use a training plan.\n\nLocation is optional and only used during active tracking to improve distance accuracy.</string>
+    <string name="onboarding_consent_checkbox">I have read and agree to the Terms of Service and Privacy Policy, and I understand the Health and AI disclaimers above.</string>
+    <string name="onboarding_agree">Agree &amp; Continue</string>
+    <string name="onboarding_decline">Decline</string>
+    <string name="onboarding_must_agree">You must accept the terms to use Y Walk.</string>
 
     <string name="botty_intro">🤖 Botty — your personal coach\nTell me your goal and a bit about you. I\'ll check if it\'s realistic and build a safe plan — never a risky one.</string>
     <string name="botty_active_header">🤖 Active plan</string>

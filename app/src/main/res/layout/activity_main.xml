@@ -1088,16 +1088,39 @@ Start a tracking session to build your history."
                     android:lineSpacingMultiplier="1.4" />
             </LinearLayout>
 
-            <TextView
-                android:id="@+id/btnPrivacyPolicy"
+            <LinearLayout
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_gravity="center_horizontal"
                 android:layout_marginTop="20dp"
-                android:padding="8dp"
-                android:text="@string/privacy_policy_link"
-                android:textSize="13sp"
-                android:textColor="@color/accent" />
+                android:orientation="horizontal">
+
+                <TextView
+                    android:id="@+id/btnPrivacyPolicy"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:padding="8dp"
+                    android:text="@string/privacy_policy_link"
+                    android:textSize="13sp"
+                    android:textColor="@color/accent" />
+
+                <TextView
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:padding="8dp"
+                    android:text="·"
+                    android:textSize="13sp"
+                    android:textColor="@color/text_secondary" />
+
+                <TextView
+                    android:id="@+id/btnTermsOfService"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:padding="8dp"
+                    android:text="@string/terms_link"
+                    android:textSize="13sp"
+                    android:textColor="@color/accent" />
+            </LinearLayout>
 
         </LinearLayout>
     </ScrollView>
