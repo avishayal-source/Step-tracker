@@ -1,51 +1,57 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Backgrounds (deep navy, livelier than flat black) -->
-    <color name="bg_dark">#0B0E1A</color>
-    <color name="surface_dark">#151A2E</color>
-    <color name="surface_elevated">#1F2742</color>
+    <!-- ══ LIGHT THEME (Y Walk) ══
+         Surfaces are light/frosted so the ywalk_background image shows through.
+         Text is dark for readability on the light background. -->
 
-    <!-- App background gradient -->
-    <color name="grad_top">#13183A</color>
-    <color name="grad_bottom">#0A0C16</color>
+    <!-- Backgrounds / base surfaces -->
+    <color name="bg_dark">#EEF2F6</color>
+    <!-- Frosted card: translucent white so the background artwork flows through -->
+    <color name="surface_dark">#D6FFFFFF</color>
+    <!-- Light chip/button surface (pills, secondary buttons) -->
+    <color name="surface_elevated">#D6EAF0F7</color>
 
-    <!-- Text -->
-    <color name="text_primary">#F5F7FF</color>
-    <color name="text_secondary">#8A90B8</color>
-    <color name="text_hint">#565C82</color>
+    <!-- App background gradient (fallback when image absent) -->
+    <color name="grad_top">#EAF1F7</color>
+    <color name="grad_bottom">#DCE6EF</color>
 
-    <!-- Accents -->
-    <color name="accent">#5C7CFA</color>
-    <color name="accent_2">#9B6BFF</color>
-    <color name="accent_cyan">#22D3EE</color>
-    <color name="accent_dim">#332A3360</color>
+    <!-- Text (dark on light) -->
+    <color name="text_primary">#16233B</color>
+    <color name="text_secondary">#51607A</color>
+    <color name="text_hint">#8A94A6</color>
 
-    <!-- Hero gradient (indigo → violet) -->
-    <color name="hero_grad_start">#3A2E7E</color>
-    <color name="hero_grad_mid">#2A2F66</color>
-    <color name="hero_grad_end">#151A2E</color>
+    <!-- Accents (darkened slightly for contrast on light) -->
+    <color name="accent">#3B5BDB</color>
+    <color name="accent_2">#7A45E0</color>
+    <color name="accent_cyan">#0E8FA6</color>
+    <color name="accent_dim">#1A3B5BDB</color>
+
+    <!-- Hero card: translucent light gradient so artwork shows through (text stays dark) -->
+    <color name="hero_grad_start">#D9F6FAFF</color>
+    <color name="hero_grad_mid">#CCE9F1FF</color>
+    <color name="hero_grad_end">#D9E2F3EE</color>
 
     <!-- Activity colours — running = coral-orange, walking = emerald -->
     <color name="color_running">#E0FF6B3D</color>
     <color name="color_walking">#E014C28A</color>
-    <color name="color_idle">#CC555C82</color>
+    <color name="color_idle">#CC8A94A6</color>
 
-    <!-- Walk stat-card gradient -->
-    <color name="walk_card_start">#1F1FB877</color>
-    <color name="walk_card_end">#0F0E3D28</color>
-    <!-- Run stat-card gradient -->
-    <color name="run_card_start">#26FF6B3D</color>
-    <color name="run_card_end">#120E2A18</color>
+    <!-- Walk stat-card gradient (light tint) -->
+    <color name="walk_card_start">#3314C28A</color>
+    <color name="walk_card_end">#0F14C28A</color>
+    <!-- Run stat-card gradient (light tint) -->
+    <color name="run_card_start">#33FF6B3D</color>
+    <color name="run_card_end">#0FFF6B3D</color>
 
     <!-- Legacy names kept for code/layout references -->
-    <color name="color_walking_card">#1C0F2318</color>
-    <color name="color_running_card">#1C2A1000</color>
-    <color name="color_walking_dim">#150F2318</color>
-    <color name="color_running_dim">#152A1000</color>
-    <color name="color_active_period">#555C7CFA</color>
-    <color name="color_done_period">#14FFFFFF</color>
+    <color name="color_walking_card">#1A14C28A</color>
+    <color name="color_running_card">#1AFF6B3D</color>
+    <color name="color_walking_dim">#1014C28A</color>
+    <color name="color_running_dim">#10FF6B3D</color>
+    <color name="color_active_period">#553B5BDB</color>
+    <color name="color_done_period">#1A000000</color>
 
     <!-- Misc -->
-    <color name="icon_bg">#151A2E</color>
-    <color name="divider">#1FFFFFFF</color>
+    <color name="icon_bg">#0E1426</color>
+    <color name="divider">#1F000000</color>
 </resources>

@@ -285,6 +285,15 @@ class MainActivity : AppCompatActivity() {
             else            -> ContextCompat.getColor(this, R.color.surface_elevated)
         }
         tvCurrentActivity.backgroundTintList = ColorStateList.valueOf(pillColor)
+        // White text on the coloured "tracking" pill, dark text on the light idle pill
+        val pillTextColor = when {
+            !svc.isTracking -> ContextCompat.getColor(this, R.color.text_primary)
+            activityType == ActivityType.RUNNING ||
+            activityType == ActivityType.JOGGING ||
+            activityType == ActivityType.WALKING -> 0xFFFFFFFF.toInt()
+            else -> ContextCompat.getColor(this, R.color.text_primary)
+        }
+        tvCurrentActivity.setTextColor(pillTextColor)
 
         // ── GPS indicator ─────────────────────────────────────────────────────
         val hasFineLocation = ContextCompat.checkSelfPermission(

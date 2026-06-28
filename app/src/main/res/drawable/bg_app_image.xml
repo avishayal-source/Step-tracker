@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Light base shows in any area the image does not cover -->
+    <item>
+        <shape android:shape="rectangle">
+            <solid android:color="@color/bg_dark" />
+        </shape>
+    </item>
+    <!-- Y Walk background artwork, scaled to fill the window -->
+    <item>
+        <bitmap
+            android:src="@drawable/ywalk_background"
+            android:gravity="fill" />
+    </item>
+</layer-list>

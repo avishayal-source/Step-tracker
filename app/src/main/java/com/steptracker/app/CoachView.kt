@@ -364,7 +364,7 @@ class CoachView(
 
     private fun label(text: String): TextView = TextView(activity).apply {
         this.text = text
-        setTextColor(Color.parseColor("#8A90B8"))
+        setTextColor(Color.parseColor("#51607A"))
         textSize = 12f
         gravity = Gravity.START
         val dp = activity.resources.displayMetrics.density

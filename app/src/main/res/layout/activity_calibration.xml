@@ -207,6 +207,7 @@
             android:layout_height="52dp"
             android:text="↺  Try Again"
             android:textSize="15sp"
+            android:textColor="@color/text_primary"
             app:cornerRadius="26dp"
             android:backgroundTint="@color/surface_dark"
             app:strokeColor="@color/accent"
