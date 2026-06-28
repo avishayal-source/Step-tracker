@@ -24,9 +24,14 @@
     <string name="onboarding_permissions_header">Permissions we\u2019ll request</string>
     <string name="onboarding_permissions_body">\u2022 Activity recognition \u2014 to count steps and detect walking vs running.\n\u2022 Notifications (optional) \u2014 for workout reminders if you use a training plan.\n\nLocation is optional and only used during active tracking to improve distance accuracy.</string>
     <string name="onboarding_consent_checkbox">I have read and agree to the Terms of Service and Privacy Policy, and I understand the Health and AI disclaimers above.</string>
+    <string name="onboarding_age_checkbox">I confirm that I am at least 13 years old (or the age of digital consent in my country) and that I am physically able to exercise.</string>
     <string name="onboarding_agree">Agree &amp; Continue</string>
     <string name="onboarding_decline">Decline</string>
     <string name="onboarding_must_agree">You must accept the terms to use Y Walk.</string>
+
+    <!-- Pre-plan physician acknowledgement (shown before scheduling a Botty plan) -->
+    <string name="plan_consult_title">Before you start this plan</string>
+    <string name="plan_consult_continue">I understand — continue</string>
 
     <string name="botty_intro">🤖 Botty — your personal coach\nTell me your goal and a bit about you. I\'ll check if it\'s realistic and build a safe plan — never a risky one.</string>
     <string name="botty_active_header">🤖 Active plan</string>

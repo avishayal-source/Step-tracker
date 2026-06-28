@@ -25,10 +25,13 @@ class OnboardingActivity : AppCompatActivity() {
         setContentView(R.layout.activity_onboarding)
 
         val cb = findViewById<CheckBox>(R.id.cbConsent)
+        val cbAge = findViewById<CheckBox>(R.id.cbAge)
         val btnAgree = findViewById<MaterialButton>(R.id.btnAgree)
         val btnDecline = findViewById<MaterialButton>(R.id.btnDecline)
 
-        cb.setOnCheckedChangeListener { _, checked -> btnAgree.isEnabled = checked }
+        val gate = { btnAgree.isEnabled = cb.isChecked && cbAge.isChecked }
+        cb.setOnCheckedChangeListener { _, _ -> gate() }
+        cbAge.setOnCheckedChangeListener { _, _ -> gate() }
 
         findViewById<MaterialButton>(R.id.btnReadTerms).setOnClickListener {
             startActivity(LegalDocActivity.terms(this))
@@ -38,7 +41,7 @@ class OnboardingActivity : AppCompatActivity() {
         }
 
         btnAgree.setOnClickListener {
-            if (!cb.isChecked) return@setOnClickListener
+            if (!cb.isChecked || !cbAge.isChecked) return@setOnClickListener
             LegalConsent.accept(this)
             requestOnboardingPermissions()
         }

@@ -311,7 +311,17 @@ class CoachView(
         if (result.plan.isEmpty()) {
             Toast.makeText(activity, "No plan to schedule", Toast.LENGTH_SHORT).show(); return
         }
+        // Recommended safety measure: require a physician-consultation
+        // acknowledgement before any plan can be scheduled.
+        AlertDialog.Builder(activity)
+            .setTitle(R.string.plan_consult_title)
+            .setMessage(R.string.health_disclaimer_full)
+            .setPositiveButton(R.string.plan_consult_continue) { _, _ -> showScheduleDialog(result) }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
 
+    private fun showScheduleDialog(result: RunPlanCoach.Result) {
         val dp = activity.resources.displayMetrics.density
         fun pad(v: Int) = (v * dp).toInt()
 

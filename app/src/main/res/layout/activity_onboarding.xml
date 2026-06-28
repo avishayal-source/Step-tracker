@@ -196,6 +196,18 @@
                 android:buttonTint="@color/accent"
                 android:lineSpacingMultiplier="1.3" />
 
+            <!-- Age / fitness confirmation -->
+            <CheckBox
+                android:id="@+id/cbAge"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="@string/onboarding_age_checkbox"
+                android:textSize="13sp"
+                android:textColor="@color/text_primary"
+                android:buttonTint="@color/accent"
+                android:lineSpacingMultiplier="1.3" />
+
         </LinearLayout>
     </ScrollView>
 
