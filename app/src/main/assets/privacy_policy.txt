@@ -45,6 +45,12 @@ Because data is stored locally, you control it:
 • You may clear session data from the Tracking tab without deleting history.
 • Contact us (see below) for questions about data practices.
 
+8a. Your regional privacy rights
+Y Walk processes data only on your device and does not transmit personal data to us, so we do not hold personal data about you on any server.
+• EEA / United Kingdom (GDPR / UK GDPR): you have the rights to access, rectify, erase, restrict, and port your personal data, and to object to processing. Because the data never leaves your device, you exercise these rights directly — for example by clearing data in the app or uninstalling it. The basis for on-device processing is your consent and the performance of the app's core functionality.
+• California (CCPA / CPRA): you have the rights to know, delete, correct, and opt out of the "sale" or "sharing" of personal information. Y Walk does not sell or share your personal information and does not serve targeted advertising.
+• To make a request or ask a question, contact us at avishayal@gmail.com.
+
 9. Health disclaimer
 This app is intended for informational and fitness purposes only. It is not a medical device and does not provide medical advice. Consult a qualified healthcare professional before beginning any exercise program, especially if you have a medical condition or experience symptoms such as chest pain, dizziness, or shortness of breath.
 
@@ -58,4 +64,4 @@ Your use of the app is also governed by our Terms of Service, which you accept w
 We may update this policy before commercial release. The "Last updated" date will change accordingly.
 
 11. Contact
-For privacy questions about Y Walk, contact the developer via the GitHub repository issue tracker or the email listed on the Google Play store listing.
+For privacy questions about Y Walk, contact the developer at avishayal@gmail.com.

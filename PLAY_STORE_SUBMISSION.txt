@@ -1,0 +1,124 @@
+Y WALK — GOOGLE PLAY SUBMISSION DRAFTS
+======================================
+Developer contact: avishayal@gmail.com
+Country / governing law: Israel
+Category: Health & Fitness
+
+These are drafts to copy into the Google Play Console. Review before submitting.
+Keep the wording NON-MEDICAL everywhere (Google rejects medical claims for
+non-medical apps).
+
+
+------------------------------------------------------------------------------
+1. DATA SAFETY FORM (Play Console > App content > Data safety)
+------------------------------------------------------------------------------
+Google defines "collection" as data sent OFF the device. Y Walk processes
+everything on-device and transmits nothing, so the answers are minimal.
+
+Q: Does your app collect or share any of the required user data types?
+   -> NO. All data is processed on the device and is not sent to us or any
+      third party.
+
+Q: Is all of the user data encrypted in transit?
+   -> Not applicable (no data is transmitted off the device).
+
+Q: Do you provide a way for users to request that their data be deleted?
+   -> Yes. Uninstalling the app deletes all of its data. Users can also clear
+      session data from the Tracking tab.
+
+Notes to keep on file (in case Google asks how permissions are used):
+• Physical activity / activity recognition: used on-device to count steps and
+  classify walking vs jogging vs running. Not transmitted.
+• Location (optional, fine/coarse): used on-device ONLY during active tracking
+  to improve distance and pace accuracy. No location/route history is stored or
+  sent. The app works without it.
+• Notifications: local workout reminders only.
+• Health profile entered in the coach (age, sex, weight, height, goals): stored
+  in encrypted preferences on the device; never transmitted.
+
+If at any point you add analytics, crash reporting, ads, or cloud features,
+this form and the Privacy Policy MUST be updated before that release.
+
+
+------------------------------------------------------------------------------
+2. PRIVACY POLICY URL (required)
+------------------------------------------------------------------------------
+Host the Privacy Policy at a public URL and paste it in:
+  Play Console > App content > Privacy policy.
+Recommended: your existing public Docs repo, e.g.
+  https://github.com/avishayal-source/Docs/blob/main/PRIVACY_POLICY.md
+Make sure that hosted copy matches app/src/main/assets/privacy_policy.txt
+(same content, including the new GDPR/CCPA section and the avishayal@gmail.com
+contact). Consider hosting the Terms of Service there too.
+
+
+------------------------------------------------------------------------------
+3. STORE LISTING
+------------------------------------------------------------------------------
+App name (max 30 chars):
+  Y Walk
+
+Short description (max 80 chars):
+  Private step, walk & run tracker with a personal coach — all on your device.
+
+Full description (max 4000 chars):
+  Y Walk is a privacy-first fitness tracker that counts your steps and tells
+  walking, jogging and running apart automatically — no account, no sign-up,
+  and your data never leaves your phone.
+
+  WHAT YOU GET
+  • Accurate step counting with on-device walk / jog / run detection.
+  • Distance and pace, refined by optional GPS while you track.
+  • A session timeline so you can see how your workout unfolded.
+  • Workout history kept locally on your device.
+  • Botty, a personal training coach that builds a simple, realistic plan from
+    your goal and adds dated workouts and reminders to your schedule.
+  • Step-length calibration for a more personal distance estimate.
+
+  PRIVACY FIRST
+  • Works fully offline. The app does not transmit your workout data to us.
+  • No ads, no trackers, no third-party analytics.
+  • Cloud backup and device transfer of app data are disabled by design.
+  • Uninstalling removes all app data.
+
+  PERMISSIONS
+  • Physical activity — to count steps and detect your activity.
+  • Location (optional) — improves distance/pace while tracking; the app works
+    without it and stores no route history.
+  • Notifications (optional) — workout reminders for your plan.
+
+  IMPORTANT — NOT A MEDICAL APP
+  Y Walk is for informational and fitness purposes only. It is not a medical
+  device and does not provide medical advice. Coaching and AI-generated
+  recommendations are informational only and do not replace professional
+  medical or fitness advice. Consult a qualified healthcare professional before
+  beginning any exercise program, especially if you have a medical condition or
+  experience symptoms such as chest pain, dizziness, or shortness of breath.
+
+
+------------------------------------------------------------------------------
+4. CONTENT RATING QUESTIONNAIRE (notes)
+------------------------------------------------------------------------------
+• No violence, sexual, gambling, or user-generated content.
+• Expected outcome: rated for Everyone / PEGI 3. Answer all questions honestly.
+
+
+------------------------------------------------------------------------------
+5. APP ACCESS / TESTING NOTES (for Google reviewers)
+------------------------------------------------------------------------------
+• No login required; all features are available without an account.
+• On first launch the app shows a consent screen (Terms, Privacy, Health & AI
+  disclaimers, age confirmation) that must be accepted to continue.
+
+
+------------------------------------------------------------------------------
+6. PRE-LAUNCH CHECKLIST
+------------------------------------------------------------------------------
+[ ] Privacy Policy hosted at a public URL and matches the in-app text.
+[ ] Terms of Service hosted (optional but recommended) and matches in-app text.
+[ ] Data Safety form completed as above.
+[ ] Store listing uses non-medical wording (no health claims).
+[ ] Content rating questionnaire completed.
+[ ] Target API level meets current Play requirement.
+[ ] Signed AAB built with the release keystore (keystore.properties not in VCS).
+[ ] Remove build junk / debug CSVs / unrelated folders from the repo.

@@ -36,5 +36,8 @@ We may update these Terms from time to time. Material changes will be presented 
 11. Privacy
 Your use of the app is also governed by our Privacy Policy, which describes how your data is handled. The app is designed to keep your data on your device.
 
-12. Contact
-For questions about these Terms, contact the developer via the email listed on the Google Play store listing or the project repository issue tracker.
+12. Governing law and jurisdiction
+These Terms are governed by the laws of the State of Israel, without regard to its conflict-of-law rules. The competent courts located in Tel Aviv-Yafo, Israel shall have exclusive jurisdiction over any dispute arising out of or relating to these Terms or your use of the app, to the fullest extent permitted by applicable law. Nothing in this section deprives you of any mandatory consumer-protection rights available to you under the law of your country of residence.
+
+13. Contact
+For questions about these Terms, contact the developer at avishayal@gmail.com.
