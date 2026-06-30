@@ -23,6 +23,7 @@ class OnboardingActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_onboarding)
+        applyRootSystemBarInsets()
 
         val cb = findViewById<CheckBox>(R.id.cbConsent)
         val cbAge = findViewById<CheckBox>(R.id.cbAge)

@@ -31,6 +31,7 @@ class LegalDocActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_privacy_policy)
+        applyRootSystemBarInsets()
         findViewById<View>(R.id.btnPrivacyBack).setOnClickListener { finish() }
 
         val title = intent.getStringExtra(EXTRA_TITLE) ?: getString(R.string.privacy_policy_title)

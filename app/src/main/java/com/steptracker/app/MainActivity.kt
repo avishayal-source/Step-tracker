@@ -99,6 +99,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         setContentView(R.layout.activity_main)
+        applyRootSystemBarInsets()
         userPrefs      = UserPrefs(this)
         workoutHistory = WorkoutHistory(this)
 
