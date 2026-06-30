@@ -1,0 +1,7 @@
+First release of Y Walk 🏃
+
+• Step counting with automatic walk/jog/run detection
+• Distance & pace with optional GPS
+• Botty coach builds a safe, personalized plan
+• Workout history & reminders
+• Fully private — all data stays on your device
