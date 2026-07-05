@@ -3,6 +3,13 @@
 All notable changes to Y Walk are documented here. Versions follow the app's
 `versionName` (and `versionCode` in parentheses).
 
+## 1.0.2 (3) — 2026-07-05
+
+Hotfix for first-launch crash on Play Store installs.
+
+- Guard `MainActivity.onDestroy()` so `scheduleView` is only accessed after it is initialized
+- Fixes crash on the consent redirect path (MainActivity → OnboardingActivity on first open)
+
 ## 1.0.1 (2) — 2026-07-04
 
 Hotfix for launch crash on Play Store installs.

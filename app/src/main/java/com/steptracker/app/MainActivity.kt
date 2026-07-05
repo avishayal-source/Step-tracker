@@ -190,7 +190,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         stopwatchHandler.removeCallbacks(stopwatchRunnable)
-        scheduleView.onActivityDestroy()
+        if (::scheduleView.isInitialized) scheduleView.onActivityDestroy()
         if (isBound) { service?.onUpdateListener = null; unbindService(connection) }
         super.onDestroy()
     }

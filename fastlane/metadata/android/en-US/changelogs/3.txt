@@ -1,0 +1,4 @@
+Fix: app no longer crashes on first launch.
+
+• Fixed crash when opening the app before onboarding completes
+• Onboarding screen now shows correctly on first install
