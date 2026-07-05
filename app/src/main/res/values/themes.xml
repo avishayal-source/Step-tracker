@@ -7,7 +7,7 @@
              override textColor explicitly in their layouts. -->
         <item name="colorOnPrimary">@android:color/white</item>
         <item name="colorSecondary">@color/accent_2</item>
-        <item name="android:windowBackground">@drawable/bg_app_image</item>
+        <item name="android:windowBackground">@color/bg_dark</item>
         <item name="android:statusBarColor">@color/grad_top</item>
         <item name="android:navigationBarColor">@color/grad_bottom</item>
         <!-- Light system bars => use dark status/nav icons -->

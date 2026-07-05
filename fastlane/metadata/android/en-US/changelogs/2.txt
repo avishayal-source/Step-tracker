@@ -1,0 +1,5 @@
+Fix: app no longer crashes on launch.
+
+• Fixed startup crash on some devices
+• Background image loads safely after the screen opens
+• Improved release build stability
