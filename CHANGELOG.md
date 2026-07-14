@@ -3,6 +3,14 @@
 All notable changes to Y Walk are documented here. Versions follow the app's
 `versionName` (and `versionCode` in parentheses).
 
+## 1.0.3 (4) — 2026-07-14
+
+UI fix for Botty form when the keyboard is open.
+
+- Apply IME (keyboard) insets so content shrinks above the keypad
+- Set `adjustResize` on MainActivity / CalibrationActivity
+- Scroll focused Botty fields into view when editing
+
 ## 1.0.2 (3) — 2026-07-05
 
 Hotfix for first-launch crash on Play Store installs.

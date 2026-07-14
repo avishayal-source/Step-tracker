@@ -1,0 +1,4 @@
+Fix: Botty form fields stay visible above the keyboard.
+
+• Keyboard no longer covers Age, Weight, Height, and other Botty fields
+• Form scrolls so the field you're editing stays on screen

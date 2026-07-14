@@ -615,6 +615,9 @@ Start a tracking session to build your history."
         android:id="@+id/pageCoach"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
+        android:fillViewport="true"
+        android:isScrollContainer="true"
+        android:clipToPadding="false"
         android:visibility="gone">
 
         <LinearLayout
@@ -622,7 +625,7 @@ Start a tracking session to build your history."
             android:layout_height="wrap_content"
             android:orientation="vertical"
             android:padding="16dp"
-            android:paddingBottom="40dp">
+            android:paddingBottom="120dp">
 
             <!-- ══ Active plan (Botty) — shown when a plan is scheduled ══ -->
             <LinearLayout

@@ -2,6 +2,7 @@ package com.steptracker.app
 
 import android.app.DatePickerDialog
 import android.graphics.Color
+import android.graphics.Rect
 import android.view.Gravity
 import android.view.View
 import android.widget.EditText
@@ -9,6 +10,7 @@ import android.widget.LinearLayout
 import android.widget.NumberPicker
 import android.widget.RadioButton
 import android.widget.RadioGroup
+import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
@@ -116,7 +118,27 @@ class CoachView(
         btnBottyViewFullPlan.setOnClickListener { showActiveFullPlan() }
         btnBottyChangeGoal.setOnClickListener { confirmChangeGoal() }
 
+        enableScrollToFocusedFields()
         refreshMode()
+    }
+
+    /** Keep the focused EditText visible above the keyboard inside the Botty ScrollView. */
+    private fun enableScrollToFocusedFields() {
+        val scroll = root as? ScrollView ?: return
+        val fields = listOf(etDistance, etWeeks, etTime, etAge, etWeight, etHeight, etCurrentRun, etDays)
+        for (field in fields) {
+            field.setOnFocusChangeListener { v, hasFocus ->
+                if (!hasFocus) return@setOnFocusChangeListener
+                // Delay until after IME insets resize the content area
+                scroll.postDelayed({
+                    val rect = Rect()
+                    v.getDrawingRect(rect)
+                    scroll.offsetDescendantRectToMyCoords(v, rect)
+                    // Leave a little breathing room above the keyboard
+                    scroll.smoothScrollTo(0, (rect.top - scroll.height / 3).coerceAtLeast(0))
+                }, 120)
+            }
+        }
     }
 
     /** Call when the Botty tab is selected — refreshes the current program week. */

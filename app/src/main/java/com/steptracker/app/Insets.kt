@@ -25,7 +25,14 @@ fun AppCompatActivity.applyRootSystemBarInsets() {
         val bars = insets.getInsets(
             WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout()
         )
-        v.updatePadding(bars.left, bars.top, bars.right, bars.bottom)
+        // Shrink content above the keyboard so ScrollViews can keep focused fields visible
+        val ime = insets.getInsets(WindowInsetsCompat.Type.ime())
+        v.updatePadding(
+            bars.left,
+            bars.top,
+            bars.right,
+            maxOf(bars.bottom, ime.bottom)
+        )
         insets
     }
     ViewCompat.requestApplyInsets(insetTarget)
