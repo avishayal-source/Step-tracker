@@ -2,7 +2,6 @@ package com.steptracker.app
 
 import android.app.DatePickerDialog
 import android.graphics.Color
-import android.graphics.Rect
 import android.view.Gravity
 import android.view.View
 import android.widget.EditText
@@ -15,7 +14,10 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import com.google.android.material.button.MaterialButton
+import android.graphics.Rect
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
@@ -122,21 +124,68 @@ class CoachView(
         refreshMode()
     }
 
-    /** Keep the focused EditText visible above the keyboard inside the Botty ScrollView. */
+    /**
+     * Keyboard-safe Botty form:
+     * 1) When the IME is open, add its height as bottom padding on the form so
+     *    the last fields can scroll fully above the keypad.
+     * 2) On focus / IME change, scroll so the field sits in the upper visible area.
+     */
     private fun enableScrollToFocusedFields() {
         val scroll = root as? ScrollView ?: return
+        val child = scroll.getChildAt(0) ?: return
+        val baseBottom = child.paddingBottom
+        val density = activity.resources.displayMetrics.density
+        val breathingRoom = (48 * density).toInt()
+        // Extra slack so lower fields can scroll up even if IME insets are late/zero
+        val fallbackSlack = (300 * density).toInt()
+
+        fun bringIntoView(target: View) {
+            scroll.post {
+                val rect = Rect()
+                target.getDrawingRect(rect)
+                scroll.offsetDescendantRectToMyCoords(target, rect)
+                // Include room for the label above the EditText
+                rect.top -= (56 * density).toInt()
+                rect.bottom += breathingRoom
+
+                val viewport = scroll.height
+                if (viewport <= 0) return@post
+                val desiredTop = scroll.scrollY + (viewport * 0.22f).toInt()
+                val delta = rect.top - desiredTop
+                if (kotlin.math.abs(delta) > 8) {
+                    scroll.smoothScrollBy(0, delta)
+                }
+                val reveal = Rect(
+                    0,
+                    -(56 * density).toInt(),
+                    target.width.coerceAtLeast(1),
+                    target.height + breathingRoom
+                )
+                target.requestRectangleOnScreen(reveal, true)
+            }
+        }
+
+        ViewCompat.setOnApplyWindowInsetsListener(scroll) { _, insets ->
+            val imeBottom = insets.getInsets(WindowInsetsCompat.Type.ime()).bottom
+            val extra = if (imeBottom > 0) imeBottom + breathingRoom else fallbackSlack
+            child.setPadding(
+                child.paddingLeft,
+                child.paddingTop,
+                child.paddingRight,
+                baseBottom + extra
+            )
+            (scroll.findFocus() as? EditText)?.let { bringIntoView(it) }
+            insets
+        }
+        ViewCompat.requestApplyInsets(scroll)
+
         val fields = listOf(etDistance, etWeeks, etTime, etAge, etWeight, etHeight, etCurrentRun, etDays)
         for (field in fields) {
             field.setOnFocusChangeListener { v, hasFocus ->
                 if (!hasFocus) return@setOnFocusChangeListener
-                // Delay until after IME insets resize the content area
-                scroll.postDelayed({
-                    val rect = Rect()
-                    v.getDrawingRect(rect)
-                    scroll.offsetDescendantRectToMyCoords(v, rect)
-                    // Leave a little breathing room above the keyboard
-                    scroll.smoothScrollTo(0, (rect.top - scroll.height / 3).coerceAtLeast(0))
-                }, 120)
+                bringIntoView(v)
+                // Second pass after typical IME animation
+                scroll.postDelayed({ bringIntoView(v) }, 300)
             }
         }
     }

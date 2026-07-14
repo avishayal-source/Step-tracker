@@ -625,7 +625,7 @@ Start a tracking session to build your history."
             android:layout_height="wrap_content"
             android:orientation="vertical"
             android:padding="16dp"
-            android:paddingBottom="120dp">
+            android:paddingBottom="200dp">
 
             <!-- ══ Active plan (Botty) — shown when a plan is scheduled ══ -->
             <LinearLayout

@@ -6,6 +6,7 @@ import android.widget.FrameLayout
 import android.widget.ImageView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.view.ViewCompat
+import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.updatePadding
 
@@ -16,8 +17,14 @@ private const val BG_WRAPPED_TAG = "ywalk_bg_wrapped"
  * bars and adds the Y Walk background as a center-crop ImageView after layout
  * (not via theme windowBackground, which decoded the full bitmap at startup and
  * could OOM on low-memory devices).
+ *
+ * Keyboard (IME) insets are NOT applied here — scrollable forms (e.g. Botty) apply
+ * IME padding on their own content so headers/tabs stay put and fields can scroll
+ * above the keypad.
  */
 fun AppCompatActivity.applyRootSystemBarInsets() {
+    WindowCompat.setDecorFitsSystemWindows(window, false)
+
     val content = findViewById<ViewGroup>(android.R.id.content)
     val insetTarget = wrapRootWithBackground(content)
 
@@ -25,14 +32,8 @@ fun AppCompatActivity.applyRootSystemBarInsets() {
         val bars = insets.getInsets(
             WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout()
         )
-        // Shrink content above the keyboard so ScrollViews can keep focused fields visible
-        val ime = insets.getInsets(WindowInsetsCompat.Type.ime())
-        v.updatePadding(
-            bars.left,
-            bars.top,
-            bars.right,
-            maxOf(bars.bottom, ime.bottom)
-        )
+        // System bars only — leave IME for the active ScrollView form.
+        v.updatePadding(bars.left, bars.top, bars.right, bars.bottom)
         insets
     }
     ViewCompat.requestApplyInsets(insetTarget)

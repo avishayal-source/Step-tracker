@@ -1,0 +1,4 @@
+Fix: Botty form scrolls comfortably above the keyboard.
+
+• Extra space under the form so the last fields can scroll up fully
+• Focused field is brought into the visible area when the keypad opens

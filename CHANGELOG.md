@@ -3,6 +3,14 @@
 All notable changes to Y Walk are documented here. Versions follow the app's
 `versionName` (and `versionCode` in parentheses).
 
+## 1.0.4 (5) — 2026-07-14
+
+Improve Botty keyboard scrolling for lower form fields.
+
+- Apply IME height as form bottom padding so last fields can scroll above the keypad
+- Stronger scroll-to-focus (upper viewport + delayed second pass)
+- Keep system-bar insets on the activity root; handle keyboard on the Botty ScrollView
+
 ## 1.0.3 (4) — 2026-07-14
 
 UI fix for Botty form when the keyboard is open.
