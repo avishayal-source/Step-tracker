@@ -50,7 +50,7 @@
     <string name="permission_rationale_cancel">Not now</string>
 
     <string name="backup_section_title">BACKUP</string>
-    <string name="backup_section_hint">Save a backup file wherever you choose (Files, Drive, email). Restore it after reinstall or on a new phone. Your data is not uploaded to Y Walk servers.</string>
+    <string name="backup_section_hint">Export or restore your data. Nothing is uploaded to Y Walk servers.</string>
     <string name="backup_export">Export backup</string>
     <string name="backup_restore">Restore backup</string>
     <string name="backup_export_ok">Backup saved</string>
