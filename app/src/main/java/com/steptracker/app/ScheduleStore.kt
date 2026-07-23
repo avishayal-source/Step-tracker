@@ -27,6 +27,11 @@ class ScheduleStore(context: Context) {
         persist(all)
     }
 
+    /** Replaces all saved schedules (used by backup restore). */
+    fun replaceAll(list: List<SavedSchedule>) {
+        persist(list)
+    }
+
     private fun persist(list: List<SavedSchedule>) {
         val arr = JSONArray()
         list.forEach { arr.put(it.toJson()) }

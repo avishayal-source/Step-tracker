@@ -1,0 +1,3 @@
+Update: target Android 16 (API 36) for Play Store compliance.
+
+• Meets Google Play target API requirement for app updates

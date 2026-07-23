@@ -48,4 +48,16 @@
     <string name="permission_rationale_message">Y Walk needs:\n\n• Activity recognition — to count steps and detect walking vs running.\n\n• Location (optional) — to measure distance more accurately while you track. Denying location still allows step-based tracking.\n\n• Notifications (optional) — for workout reminders if you use a training plan.\n\nYour workout data stays on this device and is not sent to our servers.</string>
     <string name="permission_rationale_continue">Continue</string>
     <string name="permission_rationale_cancel">Not now</string>
+
+    <string name="backup_section_title">BACKUP</string>
+    <string name="backup_section_hint">Save a backup file wherever you choose (Files, Drive, email). Restore it after reinstall or on a new phone. Your data is not uploaded to Y Walk servers.</string>
+    <string name="backup_export">Export backup</string>
+    <string name="backup_restore">Restore backup</string>
+    <string name="backup_export_ok">Backup saved</string>
+    <string name="backup_export_fail">Could not export: %1$s</string>
+    <string name="backup_restore_title">Restore backup?</string>
+    <string name="backup_restore_message">This will replace workouts, training plan, schedules, calibration, and Botty form data on this device.\n\nBackup from app %1$s · %2$d workouts · %3$d schedules%4$s</string>
+    <string name="backup_restore_ok">Restore complete</string>
+    <string name="backup_restore_fail">Could not restore: %1$s</string>
+    <string name="backup_restore_confirm">Restore</string>
 </resources>

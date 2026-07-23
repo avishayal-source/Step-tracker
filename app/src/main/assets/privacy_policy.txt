@@ -43,6 +43,7 @@ The app is not directed at children under 13. We do not knowingly collect person
 Because data is stored locally, you control it:
 • Uninstalling the app removes its data from your device.
 • You may clear session data from the Tracking tab without deleting history.
+• You may export a backup file from the Tracking tab and save it wherever you choose; restoring that file replaces local data on the device. Export does not send data to our servers.
 • Contact us (see below) for questions about data practices.
 
 8a. Your regional privacy rights

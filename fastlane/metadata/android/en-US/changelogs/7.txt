@@ -1,0 +1,6 @@
+Backup: export and restore your data as a file you control.
+
+• Export workouts, plan, schedules, and settings from the Tracking tab
+• Choose where to save (Files, Drive, email) — nothing is uploaded to Y Walk servers
+• Restore on a new phone or after reinstall
+• Targets Android 16 (API 36)

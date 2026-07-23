@@ -3,6 +3,21 @@
 All notable changes to Y Walk are documented here. Versions follow the app's
 `versionName` (and `versionCode` in parentheses).
 
+## 1.0.6 (7) — 2026-07-23
+
+User-owned backup export / restore on the Tracking tab.
+
+- Export workouts, training plan, schedules, calibration, and Botty form to a JSON file
+- User picks the save/open location via the system file picker
+- Restore replaces local data (does not skip legal onboarding)
+- Includes API 36 target from 1.0.5
+
+## 1.0.5 (6) — 2026-07-23
+
+Play compliance: target Android 16 (API 36).
+
+- Bump compileSdk / targetSdk from 35 to 36
+
 ## 1.0.4 (5) — 2026-07-14
 
 Improve Botty keyboard scrolling for lower form fields.

@@ -195,6 +195,12 @@ class CoachView(
         refreshMode()
     }
 
+    /** Reload coach form + active-plan panels after a backup restore. */
+    fun reloadAfterBackupRestore() {
+        restoreInputs()
+        refreshMode()
+    }
+
     private fun refreshMode() {
         val plan = planStore.load()
         if (plan != null && plan.workouts.isNotEmpty()) {

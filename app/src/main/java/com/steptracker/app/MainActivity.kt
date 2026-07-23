@@ -4,6 +4,7 @@ import android.Manifest
 import android.content.*
 import android.content.pm.PackageManager
 import android.content.res.ColorStateList
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
@@ -11,6 +12,7 @@ import android.os.IBinder
 import android.os.Looper
 import android.view.*
 import android.widget.*
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
@@ -79,6 +81,29 @@ class MainActivity : AppCompatActivity() {
     private lateinit var userPrefs: UserPrefs
     private lateinit var workoutHistory: WorkoutHistory
 
+    private val exportBackupLauncher = registerForActivityResult(
+        ActivityResultContracts.CreateDocument(BackupManager.mimeType)
+    ) { uri: Uri? ->
+        if (uri == null) return@registerForActivityResult
+        try {
+            BackupManager.exportToUri(this, uri)
+            Toast.makeText(this, R.string.backup_export_ok, Toast.LENGTH_LONG).show()
+        } catch (e: Exception) {
+            Toast.makeText(
+                this,
+                getString(R.string.backup_export_fail, e.message ?: "error"),
+                Toast.LENGTH_LONG
+            ).show()
+        }
+    }
+
+    private val importBackupLauncher = registerForActivityResult(
+        ActivityResultContracts.OpenDocument()
+    ) { uri: Uri? ->
+        if (uri == null) return@registerForActivityResult
+        confirmAndRestoreBackup(uri)
+    }
+
     private val stopwatchHandler = Handler(Looper.getMainLooper())
     private val stopwatchRunnable = object : Runnable {
         override fun run() {
@@ -139,6 +164,13 @@ class MainActivity : AppCompatActivity() {
         btnStartStop.setOnClickListener { toggleTracking() }
         btnReset.setOnClickListener     { confirmReset() }
         btnCalibrate.setOnClickListener { startActivity(Intent(this, CalibrationActivity::class.java)) }
+
+        findViewById<MaterialButton>(R.id.btnExportBackup).setOnClickListener {
+            exportBackupLauncher.launch(BackupManager.suggestedFileName())
+        }
+        findViewById<MaterialButton>(R.id.btnRestoreBackup).setOnClickListener {
+            importBackupLauncher.launch(arrayOf("application/json", "text/plain", "*/*"))
+        }
 
         scheduleView = ScheduleEmbeddedView(this, pageSchedule)
         scheduleView.setup()
@@ -257,6 +289,48 @@ class MainActivity : AppCompatActivity() {
             .setMessage("This clears the current session. Workout history is preserved.")
             .setPositiveButton("Reset") { _, _ -> svc.resetData(); updateTrackingUI() }
             .setNegativeButton("Cancel", null).show()
+    }
+
+    private fun confirmAndRestoreBackup(uri: Uri) {
+        try {
+            val summary = BackupManager.peekSummary(this, uri)
+            val planNote = if (summary.hasPlan) " · includes training plan" else ""
+            AlertDialog.Builder(this)
+                .setTitle(R.string.backup_restore_title)
+                .setMessage(
+                    getString(
+                        R.string.backup_restore_message,
+                        summary.appVersionName,
+                        summary.workoutCount,
+                        summary.scheduleCount,
+                        planNote
+                    )
+                )
+                .setPositiveButton(R.string.backup_restore_confirm) { _, _ ->
+                    try {
+                        BackupManager.importFromUri(this, uri)
+                        userPrefs = UserPrefs(this)
+                        coachView.reloadAfterBackupRestore()
+                        updateTrackingUI()
+                        updateHistoryUI()
+                        Toast.makeText(this, R.string.backup_restore_ok, Toast.LENGTH_LONG).show()
+                    } catch (e: Exception) {
+                        Toast.makeText(
+                            this,
+                            getString(R.string.backup_restore_fail, e.message ?: "error"),
+                            Toast.LENGTH_LONG
+                        ).show()
+                    }
+                }
+                .setNegativeButton(android.R.string.cancel, null)
+                .show()
+        } catch (e: Exception) {
+            Toast.makeText(
+                this,
+                getString(R.string.backup_restore_fail, e.message ?: "error"),
+                Toast.LENGTH_LONG
+            ).show()
+        }
     }
 
     private fun startTrackingService() {
