@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <group android:id="@+id/group_backup">
+        <item
+            android:id="@+id/action_export_backup"
+            android:title="@string/backup_export" />
+        <item
+            android:id="@+id/action_restore_backup"
+            android:title="@string/backup_restore" />
+    </group>
+    <group android:id="@+id/group_legal">
+        <item
+            android:id="@+id/action_privacy"
+            android:title="@string/privacy_policy_title" />
+        <item
+            android:id="@+id/action_terms"
+            android:title="@string/terms_title" />
+    </group>
+</menu>

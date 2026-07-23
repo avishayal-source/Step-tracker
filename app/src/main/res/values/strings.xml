@@ -49,6 +49,7 @@
     <string name="permission_rationale_continue">Continue</string>
     <string name="permission_rationale_cancel">Not now</string>
 
+    <string name="more_menu_desc">More options</string>
     <string name="backup_section_title">BACKUP</string>
     <string name="backup_section_hint">Export or restore your data. Nothing is uploaded to Y Walk servers.</string>
     <string name="backup_export">Export backup</string>

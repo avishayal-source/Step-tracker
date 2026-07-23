@@ -3,6 +3,13 @@
 All notable changes to Y Walk are documented here. Versions follow the app's
 `versionName` (and `versionCode` in parentheses).
 
+## 1.0.7 (8) — 2026-07-23
+
+Move backup and legal links into a top-bar More menu.
+
+- Add ⋮ overflow menu: Export backup, Restore backup, Privacy Policy, Terms of Service
+- Remove backup section from the Tracking tab (tabs stay for main navigation)
+
 ## 1.0.6 (7) — 2026-07-23
 
 User-owned backup export / restore on the Tracking tab.

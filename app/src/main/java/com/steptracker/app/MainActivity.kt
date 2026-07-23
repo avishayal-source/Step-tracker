@@ -165,12 +165,7 @@ class MainActivity : AppCompatActivity() {
         btnReset.setOnClickListener     { confirmReset() }
         btnCalibrate.setOnClickListener { startActivity(Intent(this, CalibrationActivity::class.java)) }
 
-        findViewById<MaterialButton>(R.id.btnExportBackup).setOnClickListener {
-            exportBackupLauncher.launch(BackupManager.suggestedFileName())
-        }
-        findViewById<MaterialButton>(R.id.btnRestoreBackup).setOnClickListener {
-            importBackupLauncher.launch(arrayOf("application/json", "text/plain", "*/*"))
-        }
+        findViewById<View>(R.id.btnMore).setOnClickListener { anchor -> showMoreMenu(anchor) }
 
         scheduleView = ScheduleEmbeddedView(this, pageSchedule)
         scheduleView.setup()
@@ -205,6 +200,29 @@ class MainActivity : AppCompatActivity() {
             Toast.makeText(this, "Tip: tap ⚙ Calibrate to set your personal step length", Toast.LENGTH_LONG).show()
 
         handleIntentExtras(intent)
+    }
+
+    private fun showMoreMenu(anchor: View) {
+        val popup = androidx.appcompat.widget.PopupMenu(this, anchor)
+        popup.menuInflater.inflate(R.menu.more_menu, popup.menu)
+        popup.setOnMenuItemClickListener { item ->
+            when (item.itemId) {
+                R.id.action_export_backup -> {
+                    exportBackupLauncher.launch(BackupManager.suggestedFileName()); true
+                }
+                R.id.action_restore_backup -> {
+                    importBackupLauncher.launch(arrayOf("application/json", "text/plain", "*/*")); true
+                }
+                R.id.action_privacy -> {
+                    startActivity(LegalDocActivity.privacy(this)); true
+                }
+                R.id.action_terms -> {
+                    startActivity(LegalDocActivity.terms(this)); true
+                }
+                else -> false
+            }
+        }
+        popup.show()
     }
 
     override fun onNewIntent(intent: Intent) {

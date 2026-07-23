@@ -36,6 +36,15 @@
                 android:textColor="@color/text_secondary"
                 android:fontFamily="sans-serif-medium" />
         </LinearLayout>
+
+        <ImageButton
+            android:id="@+id/btnMore"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:src="@drawable/ic_more_vert"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/more_menu_desc"
+            android:scaleType="centerInside" />
     </LinearLayout>
 
     <!-- Gradient accent underline -->
@@ -350,63 +359,6 @@
                 android:paddingHorizontal="24dp"
                 android:textColor="@color/text_secondary"
                 android:textSize="13sp" />
-
-            <!-- Backup: user-owned file export / restore -->
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:layout_marginHorizontal="16dp"
-                android:text="@string/backup_section_title"
-                android:textSize="10sp"
-                android:letterSpacing="0.15"
-                android:textColor="@color/text_secondary"
-                android:fontFamily="sans-serif-medium" />
-
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="4dp"
-                android:layout_marginHorizontal="16dp"
-                android:text="@string/backup_section_hint"
-                android:textSize="12sp"
-                android:textColor="@color/text_secondary"
-                android:lineSpacingMultiplier="1.35" />
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:layout_marginHorizontal="16dp"
-                android:layout_marginTop="10dp"
-                android:layout_marginBottom="8dp">
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnExportBackup"
-                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                    android:layout_width="0dp"
-                    android:layout_height="48dp"
-                    android:layout_weight="1"
-                    android:layout_marginEnd="6dp"
-                    android:text="@string/backup_export"
-                    android:textSize="13sp"
-                    android:textColor="@color/text_primary"
-                    app:cornerRadius="24dp"
-                    app:strokeColor="@color/accent" />
-
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnRestoreBackup"
-                    style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-                    android:layout_width="0dp"
-                    android:layout_height="48dp"
-                    android:layout_weight="1"
-                    android:layout_marginStart="6dp"
-                    android:text="@string/backup_restore"
-                    android:textSize="13sp"
-                    android:textColor="@color/text_primary"
-                    app:cornerRadius="24dp"
-                    app:strokeColor="@color/accent" />
-            </LinearLayout>
 
         </LinearLayout>
     </ScrollView>
