@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Y Walk</string>
+    <string name="home_title">Y Walk</string>
+    <string name="home_subtitle">Wear OS MVP</string>
+    <string name="status_waiting">Waiting for phone…</string>
+    <string name="status_connected">Phone linked</string>
+    <string name="btn_ping_phone">Ping phone</string>
+    <string name="ping_sent">Ping sent</string>
+    <string name="ping_failed">No phone nearby</string>
+</resources>

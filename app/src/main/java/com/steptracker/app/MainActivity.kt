@@ -26,6 +26,8 @@ class MainActivity : AppCompatActivity() {
         const val EXTRA_OPEN_SCHEDULE = "extra_open_schedule"
     }
 
+    private var wearSync: com.steptracker.app.wear.WearSyncManager? = null
+
     private var service: StepTrackerService? = null
     private var isBound = false
     private val connection = object : ServiceConnection {
@@ -161,6 +163,17 @@ class MainActivity : AppCompatActivity() {
             Toast.makeText(this, "Tip: tap ⚙ Calibrate to set your personal step length", Toast.LENGTH_LONG).show()
 
         handleIntentExtras(intent)
+
+        wearSync = com.steptracker.app.wear.WearSyncManager(this) { _ ->
+            runOnUiThread {
+                Toast.makeText(this, "⌚ Watch ping received", Toast.LENGTH_SHORT).show()
+            }
+        }.also { it.start() }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        wearSync?.sendHelloToWatches()
     }
 
     override fun onNewIntent(intent: Intent) {
@@ -177,6 +190,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
+        wearSync?.stop()
+        wearSync = null
         stopwatchHandler.removeCallbacks(stopwatchRunnable)
         scheduleView.onActivityDestroy()
         if (isBound) { service?.onUpdateListener = null; unbindService(connection) }

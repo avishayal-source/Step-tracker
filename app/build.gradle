@@ -76,4 +76,11 @@ dependencies {
     implementation 'androidx.room:room-runtime:2.6.1'
     implementation 'androidx.room:room-ktx:2.6.1'
     ksp 'androidx.room:room-compiler:2.6.1'
+
+    // Wear OS Data Layer (phone ↔ watch)
+    implementation 'com.google.android.gms:play-services-wearable:18.1.0'
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.7.3'
+
+    // Embed Wear APK with phone release for Play delivery
+    wearApp project(':wear')
 }
