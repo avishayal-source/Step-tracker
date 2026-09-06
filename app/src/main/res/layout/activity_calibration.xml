@@ -58,11 +58,30 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="You can calibrate both — start with one,\nthen come back for the other."
+            android:text="Your height helps reject unrealistic step lengths.\nCalibrate outdoors on flat ground when possible."
             android:textSize="13sp"
             android:textColor="@color/text_secondary"
             android:gravity="center"
-            android:layout_marginBottom="40dp" />
+            android:layout_marginBottom="16dp" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Height (cm)"
+            android:textSize="12sp"
+            android:textColor="@color/text_secondary" />
+
+        <EditText
+            android:id="@+id/etCalibHeight"
+            android:layout_width="160dp"
+            android:layout_height="wrap_content"
+            android:inputType="numberDecimal"
+            android:hint="e.g. 185"
+            android:textColorHint="@color/text_hint"
+            android:textColor="@color/text_primary"
+            android:textSize="16sp"
+            android:gravity="center"
+            android:layout_marginBottom="28dp" />
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnCalibWalk"

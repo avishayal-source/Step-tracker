@@ -18,4 +18,19 @@ class UserPrefs(context: Context) {
     var isCalibrated: Boolean
         get() = prefs.getBoolean("calibrated", false)
         set(v) { prefs.edit().putBoolean("calibrated", v).apply() }
+
+    /** Optional height for anthropometric stride suggestions (cm). 0 = unset. */
+    var heightCm: Float
+        get() = prefs.getFloat("height_cm", 0f)
+        set(v) { prefs.edit().putFloat("height_cm", v).apply() }
+
+    companion object {
+        /** Typical walk stride ≈ 41.5% of height. */
+        fun expectedWalkStrideM(heightCm: Float): Double =
+            (heightCm / 100.0) * 0.415
+
+        /** Typical easy-jog stride ≈ 65% of height. */
+        fun expectedRunStrideM(heightCm: Float): Double =
+            (heightCm / 100.0) * 0.65
+    }
 }

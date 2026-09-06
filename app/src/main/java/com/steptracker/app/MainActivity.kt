@@ -128,6 +128,18 @@ class MainActivity : AppCompatActivity() {
         userPrefs      = UserPrefs(this)
         workoutHistory = WorkoutHistory(this)
 
+        // Invalidate half-stride calibrations from older builds (e.g. 0.41 m walk).
+        if (userPrefs.isCalibrated &&
+            (userPrefs.walkStrideM < 0.55 || userPrefs.runStrideM < 0.85)
+        ) {
+            userPrefs.isCalibrated = false
+            Toast.makeText(
+                this,
+                "Previous step lengths looked too short — please recalibrate (⚙).",
+                Toast.LENGTH_LONG
+            ).show()
+        }
+
         tabLayout    = findViewById(R.id.tabLayout)
         pageTracking = findViewById(R.id.pageTracking)
         pageSchedule = findViewById(R.id.pageSchedule)

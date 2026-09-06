@@ -20,26 +20,23 @@ import kotlin.math.sqrt
 /**
  * Live step length calibration wizard.
  *
- * Bugs fixed vs previous version:
- * 1. event.timestamp is nanoseconds-since-boot — used wall clock instead
- *    (System.currentTimeMillis()) for MIN_STEP_MS comparisons.
- * 2. GPS fallback threshold reduced to 2m so short calibration walks
- *    (indoors/covered area) still use GPS rather than prompting manually.
- * 3. Instruction text now correctly says "jog" when calibrating jog.
- * 4. MIN_STEPS raised to 30 for more accurate averaging.
- * 5. GPS accuracy filter added — reject fixes worse than 20m.
+ * Hardening (2026-08):
+ * - Higher peak threshold + longer min step gap to cut double-counted steps
+ *   (stored strides ~0.41 / 0.73 m were ~½ of norms for a 1.85 m adult).
+ * - Require meaningful GPS distance (≥20 m) before accepting GPS stride.
+ * - Stricter accept ranges; optional height for anthropometric cross-check.
  */
 class CalibrationActivity : AppCompatActivity(), SensorEventListener {
 
     private enum class Phase { SELECT, COUNTING, RESULT }
 
-    // ── UI ────────────────────────────────────────────────────────────────────
     private lateinit var tvTitle: TextView
     private lateinit var tvInstructions: TextView
     private lateinit var tvStepCount: TextView
     private lateinit var tvDistance: TextView
     private lateinit var tvStride: TextView
     private lateinit var tvGpsStatus: TextView
+    private lateinit var etHeight: EditText
     private lateinit var btnWalk: MaterialButton
     private lateinit var btnJog: MaterialButton
     private lateinit var btnStart: MaterialButton
@@ -50,44 +47,39 @@ class CalibrationActivity : AppCompatActivity(), SensorEventListener {
     private lateinit var layoutCounting: View
     private lateinit var layoutResult: View
 
-    // ── Sensors ───────────────────────────────────────────────────────────────
     private lateinit var sensorManager: SensorManager
     private var locationManager: LocationManager? = null
     private lateinit var userPrefs: UserPrefs
 
-    // Accelerometer step detection
-    private val GRAVITY_ALPHA  = 0.80f
-    private val PEAK_THRESHOLD = 1.5f
-    private val MIN_STEP_MS    = 220L
+    // Stricter than the main tracker: calibration must not double-count peaks.
+    private val GRAVITY_ALPHA = 0.80f
+    private val PEAK_THRESHOLD = 2.4f
+    private val MIN_STEP_MS = 300L   // ≤ 200 SPM — enough for jog, cuts half-period doubles
     private var gx = 0f; private var gy = 0f; private var gz = 9.81f
     private var lastMag = 0f
     private var rising = false
-    // FIX #1: use wall-clock ms, not sensor boot timestamp
     private var lastStepWallMs = 0L
 
-    // ── State ─────────────────────────────────────────────────────────────────
     private var calibratingJog = false
     private var phase = Phase.SELECT
     private var stepCount = 0
     private var gpsDistanceM = 0.0
     private var lastLocation: Location? = null
     private var computedStride = 0.0
-    // FIX #4: more steps = better average
-    private val MIN_STEPS = 30
+    private val MIN_STEPS = 40
+    private val MIN_GPS_DIST_M = 20.0
 
     private val locationListener = object : LocationListener {
         override fun onLocationChanged(loc: Location) {
-            // FIX #5: reject inaccurate fixes
-            if (loc.hasAccuracy() && loc.accuracy > 20f) return
+            if (loc.hasAccuracy() && loc.accuracy > 15f) return
             lastLocation?.let { prev ->
                 val delta = prev.distanceTo(loc).toDouble()
-                if (delta in 0.3..50.0) {
+                if (delta in 0.5..40.0) {
                     gpsDistanceM += delta
                     runOnUiThread { updateCountingUI() }
                 }
             }
             lastLocation = loc
-            // Update GPS status once we have a real fix
             runOnUiThread {
                 val acc = if (loc.hasAccuracy()) " (±${loc.accuracy.toInt()}m)" else ""
                 tvGpsStatus.text = "📍 GPS fix$acc  —  ${gpsDistanceM.toInt()} m accumulated"
@@ -98,8 +90,6 @@ class CalibrationActivity : AppCompatActivity(), SensorEventListener {
         override fun onProviderEnabled(p: String) {}
         override fun onProviderDisabled(p: String) {}
     }
-
-    // ─────────────────────────────────────────────────────────────────────────
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -116,6 +106,7 @@ class CalibrationActivity : AppCompatActivity(), SensorEventListener {
         tvDistance     = findViewById(R.id.tvCalibDistance)
         tvStride       = findViewById(R.id.tvCalibStride)
         tvGpsStatus    = findViewById(R.id.tvCalibGpsStatus)
+        etHeight       = findViewById(R.id.etCalibHeight)
         btnWalk        = findViewById(R.id.btnCalibWalk)
         btnJog         = findViewById(R.id.btnCalibJog)
         btnStart       = findViewById(R.id.btnCalibStart)
@@ -126,8 +117,12 @@ class CalibrationActivity : AppCompatActivity(), SensorEventListener {
         layoutCounting = findViewById(R.id.layoutCalibCounting)
         layoutResult   = findViewById(R.id.layoutCalibResult)
 
-        btnWalk.setOnClickListener   { calibratingJog = false; showPhase(Phase.COUNTING) }
-        btnJog.setOnClickListener    { calibratingJog = true;  showPhase(Phase.COUNTING) }
+        if (userPrefs.heightCm > 0f) {
+            etHeight.setText("%.0f".format(userPrefs.heightCm))
+        }
+
+        btnWalk.setOnClickListener   { if (saveHeightOrWarn()) { calibratingJog = false; showPhase(Phase.COUNTING) } }
+        btnJog.setOnClickListener    { if (saveHeightOrWarn()) { calibratingJog = true;  showPhase(Phase.COUNTING) } }
         btnStart.setOnClickListener  { startCounting() }
         btnStop.setOnClickListener   { stopCounting() }
         btnAccept.setOnClickListener { acceptResult() }
@@ -137,13 +132,30 @@ class CalibrationActivity : AppCompatActivity(), SensorEventListener {
         showPhase(Phase.SELECT)
     }
 
+    /** Height is optional but strongly recommended; empty is allowed with a toast. */
+    private fun saveHeightOrWarn(): Boolean {
+        val h = etHeight.text.toString().toFloatOrNull()
+        if (h != null) {
+            if (h !in 120f..230f) {
+                Toast.makeText(this, "Enter a height between 120 and 230 cm", Toast.LENGTH_LONG).show()
+                return false
+            }
+            userPrefs.heightCm = h
+        } else {
+            Toast.makeText(
+                this,
+                "Tip: enter your height so we can reject unrealistic step lengths",
+                Toast.LENGTH_LONG
+            ).show()
+        }
+        return true
+    }
+
     override fun onDestroy() {
         super.onDestroy()
         sensorManager.unregisterListener(this)
         try { locationManager?.removeUpdates(locationListener) } catch (_: Exception) {}
     }
-
-    // ── Phase management ──────────────────────────────────────────────────────
 
     private fun showPhase(p: Phase) {
         phase = p
@@ -161,15 +173,15 @@ class CalibrationActivity : AppCompatActivity(), SensorEventListener {
             Phase.COUNTING -> {
                 stepCount = 0; gpsDistanceM = 0.0; lastLocation = null
                 computedStride = 0.0; lastStepWallMs = 0L
-                // FIX #3: correct verb for jog vs walk
+                lastMag = 0f; rising = false
                 val verb = if (calibratingJog) "jog" else "walk"
                 val Verb = if (calibratingJog) "Jog" else "Walk"
                 tvTitle.text = "Calibrate $Verb Step Length"
                 tvInstructions.text =
-                    "Tap Start, then $verb in a straight line on flat ground for at " +
-                    "least $MIN_STEPS steps. Tap Stop when done.\n\n" +
-                    "GPS measures the distance automatically. If GPS is unavailable, " +
-                    "${verb} along a known distance (e.g. a marked 30m path)."
+                    "Tap Start, then $verb in a straight line on flat open ground for at " +
+                    "least $MIN_STEPS steps (aim for 40–80 m). Tap Stop when done.\n\n" +
+                    "GPS needs ~${MIN_GPS_DIST_M.toInt()} m of good signal. If GPS is weak, " +
+                    "${verb} a known marked distance instead."
                 tvStepCount.text = "0 steps"
                 tvDistance.text  = "—"
                 tvGpsStatus.text = "GPS: waiting for fix…"
@@ -181,19 +193,37 @@ class CalibrationActivity : AppCompatActivity(), SensorEventListener {
                 val Verb = if (calibratingJog) "Jog" else "Walk"
                 tvTitle.text = "Result — $Verb Step Length"
                 val current = if (calibratingJog) userPrefs.runStrideM else userPrefs.walkStrideM
+                val distUsed = if (gpsDistanceM >= MIN_GPS_DIST_M) gpsDistanceM else computedStride * stepCount
+                val heightNote = expectedStrideNote()
                 tvStride.text =
                     "Measured:  ${"%.3f".format(computedStride)} m/step\n" +
                     "Steps taken:  $stepCount\n" +
-                    "Distance used:  ${"%.2f".format(if (gpsDistanceM >= 2.0) gpsDistanceM else computedStride * stepCount)} m\n\n" +
-                    "Previously saved:  ${"%.3f".format(current)} m/step"
+                    "Distance used:  ${"%.1f".format(distUsed)} m\n\n" +
+                    "Previously saved:  ${"%.3f".format(current)} m/step" +
+                    heightNote
             }
         }
     }
 
-    // ── Counting phase ────────────────────────────────────────────────────────
+    private fun expectedStrideNote(): String {
+        val h = userPrefs.heightCm
+        if (h < 120f) return ""
+        val exp = if (calibratingJog)
+            UserPrefs.expectedRunStrideM(h) else UserPrefs.expectedWalkStrideM(h)
+        val ratio = computedStride / exp
+        val flag = when {
+            ratio < 0.70 -> "\n\n⚠ This is much shorter than typical for ${h.toInt()} cm " +
+                "(~${"%.2f".format(exp)} m). Steps may have been over-counted — retry outdoors."
+            ratio > 1.35 -> "\n\n⚠ This is longer than typical for ${h.toInt()} cm " +
+                "(~${"%.2f".format(exp)} m). Check GPS / try again."
+            else -> "\n\nTypical for ${h.toInt()} cm: ~${"%.2f".format(exp)} m"
+        }
+        return flag
+    }
 
     private fun startCounting() {
         stepCount = 0; gpsDistanceM = 0.0; lastLocation = null; lastStepWallMs = 0L
+        lastMag = 0f; rising = false
         btnStart.visibility = View.GONE
         btnStop.visibility  = View.VISIBLE
         btnStop.isEnabled   = false
@@ -216,9 +246,8 @@ class CalibrationActivity : AppCompatActivity(), SensorEventListener {
     private fun startGpsUpdates() {
         val lm = locationManager ?: return
         try {
-            val providers = lm.getProviders(true)   // all currently-enabled providers
+            val providers = lm.getProviders(true)
             var started = false
-            // Prefer GPS, then fall back to anything available
             val ordered = providers.sortedByDescending {
                 when (it) {
                     LocationManager.GPS_PROVIDER     -> 2
@@ -231,7 +260,7 @@ class CalibrationActivity : AppCompatActivity(), SensorEventListener {
                     lm.requestLocationUpdates(provider, 500L, 0.5f,
                         locationListener, Looper.getMainLooper())
                     started = true
-                    break   // use best provider only
+                    break
                 } catch (_: Exception) {}
             }
             tvGpsStatus.text = if (started) "📍 GPS acquiring fix…" else "⚠ No location provider — use known distance"
@@ -260,8 +289,7 @@ class CalibrationActivity : AppCompatActivity(), SensorEventListener {
             return
         }
 
-        // FIX #2: use GPS if we have at least 2m (not 5m as before)
-        if (gpsDistanceM >= 2.0) {
+        if (gpsDistanceM >= MIN_GPS_DIST_M) {
             computedStride = gpsDistanceM / stepCount
             showPhase(Phase.RESULT)
         } else {
@@ -272,23 +300,26 @@ class CalibrationActivity : AppCompatActivity(), SensorEventListener {
     private fun askManualDistance() {
         val verb = if (calibratingJog) "jogged" else "walked"
         val et = EditText(this).apply {
-            hint = "e.g. 25.0"
+            hint = "e.g. 50.0"
             inputType = android.text.InputType.TYPE_CLASS_NUMBER or
                         android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL
             setPadding(60, 20, 60, 20)
         }
         android.app.AlertDialog.Builder(this)
             .setTitle("Enter distance $verb (metres)")
-            .setMessage("GPS wasn't available. How many metres did you $verb?\n" +
-                        "Steps counted: $stepCount")
+            .setMessage(
+                "GPS only recorded ${"%.1f".format(gpsDistanceM)} m " +
+                    "(need ≥${MIN_GPS_DIST_M.toInt()} m outdoors).\n\n" +
+                    "How many metres did you $verb?\nSteps counted: $stepCount"
+            )
             .setView(et)
             .setPositiveButton("Calculate") { _, _ ->
                 val dist = et.text.toString().toDoubleOrNull()
-                if (dist != null && dist > 1.0) {
+                if (dist != null && dist >= 15.0) {
                     computedStride = dist / stepCount
                     showPhase(Phase.RESULT)
                 } else {
-                    Toast.makeText(this, "Enter a valid distance in metres",
+                    Toast.makeText(this, "Enter at least 15 metres for a usable average",
                         Toast.LENGTH_SHORT).show()
                 }
             }
@@ -297,14 +328,29 @@ class CalibrationActivity : AppCompatActivity(), SensorEventListener {
 
     private fun acceptResult() {
         if (computedStride <= 0.0) return
-        // Sanity-check the result
-        val minOk = if (calibratingJog) 0.5 else 0.4
-        val maxOk = if (calibratingJog) 2.0 else 1.2
+        // Adult ranges — previous floors (0.4 / 0.5) accepted half-stride bugs.
+        val minOk = if (calibratingJog) 0.85 else 0.55
+        val maxOk = if (calibratingJog) 1.80 else 1.05
         if (computedStride < minOk || computedStride > maxOk) {
             Toast.makeText(this,
-                "Result (${"%.2f".format(computedStride)}m) looks unusual. " +
-                "Try again with more steps.", Toast.LENGTH_LONG).show()
+                "Result (${"%.2f".format(computedStride)} m) is outside the normal " +
+                    "${"%.2f".format(minOk)}–${"%.2f".format(maxOk)} m range. " +
+                    "Retry outdoors with a longer straight path.",
+                Toast.LENGTH_LONG).show()
             return
+        }
+        // Extra height cross-check when available
+        val h = userPrefs.heightCm
+        if (h >= 120f) {
+            val exp = if (calibratingJog)
+                UserPrefs.expectedRunStrideM(h) else UserPrefs.expectedWalkStrideM(h)
+            if (computedStride < exp * 0.65) {
+                Toast.makeText(this,
+                    "Too short vs your height (expected ~${"%.2f".format(exp)} m). " +
+                        "Likely over-counted steps — please recalibrate.",
+                    Toast.LENGTH_LONG).show()
+                return
+            }
         }
         if (calibratingJog) userPrefs.runStrideM  = computedStride
         else                userPrefs.walkStrideM = computedStride
@@ -314,8 +360,6 @@ class CalibrationActivity : AppCompatActivity(), SensorEventListener {
             Toast.LENGTH_LONG).show()
         showPhase(Phase.SELECT)
     }
-
-    // ── SensorEventListener ───────────────────────────────────────────────────
 
     override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
 
@@ -327,23 +371,25 @@ class CalibrationActivity : AppCompatActivity(), SensorEventListener {
         gz = GRAVITY_ALPHA * gz + (1 - GRAVITY_ALPHA) * az
         val mag = sqrt(((ax-gx)*(ax-gx) + (ay-gy)*(ay-gy) + (az-gz)*(az-gz)).toDouble()).toFloat()
 
-        if (mag > lastMag) { rising = true }
-        else if (rising && lastMag > PEAK_THRESHOLD) {
+        if (mag > lastMag) {
+            rising = true
+        } else if (rising && lastMag > PEAK_THRESHOLD) {
             rising = false
-            // FIX #1: wall-clock time, NOT sensor boot timestamp
             val nowMs = System.currentTimeMillis()
             if (nowMs - lastStepWallMs >= MIN_STEP_MS) {
                 lastStepWallMs = nowMs
                 stepCount++
                 runOnUiThread { updateCountingUI() }
             }
-        } else { rising = false }
+        } else {
+            rising = false
+        }
         lastMag = mag
     }
 
     private fun updateCountingUI() {
         tvStepCount.text = "$stepCount steps"
-        tvDistance.text  = if (gpsDistanceM >= 0.3)
+        tvDistance.text  = if (gpsDistanceM >= 0.5)
             "${"%.1f".format(gpsDistanceM)} m (GPS)"
         else
             "Waiting for GPS fix…"

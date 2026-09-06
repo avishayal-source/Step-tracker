@@ -3,6 +3,13 @@
 All notable changes to Y Walk are documented here. Versions follow the app's
 `versionName` (and `versionCode` in parentheses).
 
+## 1.0.8 (9) — 2026-08-23
+
+Fix bad calibration strides and false walking during continuous runs.
+
+- Calibration: stricter step detection, ≥20 m GPS, adult accept ranges, optional height check
+- Classifier v12: run→walk also requires walking cadence (holds jog on GPS dips at high SPM)
+
 ## 1.0.7 (8) — 2026-07-23
 
 Move backup and legal links into a top-bar More menu.

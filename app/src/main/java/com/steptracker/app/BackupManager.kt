@@ -74,6 +74,7 @@ object BackupManager {
                 put("walk_stride", userPrefs.walkStrideM)
                 put("run_stride", userPrefs.runStrideM)
                 put("calibrated", userPrefs.isCalibrated)
+                put("height_cm", userPrefs.heightCm.toDouble())
             })
             put("coachPrefs", coachObj)
         }
@@ -162,6 +163,7 @@ object BackupManager {
             if (up.has("walk_stride")) userPrefs.walkStrideM = up.getDouble("walk_stride")
             if (up.has("run_stride")) userPrefs.runStrideM = up.getDouble("run_stride")
             if (up.has("calibrated")) userPrefs.isCalibrated = up.getBoolean("calibrated")
+            if (up.has("height_cm")) userPrefs.heightCm = up.getDouble("height_cm").toFloat()
         }
 
         // Coach form

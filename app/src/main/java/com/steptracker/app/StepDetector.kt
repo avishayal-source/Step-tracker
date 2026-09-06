@@ -7,48 +7,19 @@ import android.util.Log
 import kotlin.math.sqrt
 
 /**
- * Walk/run classifier — v11 (GPS-speed Kalman + accelerometer gait gate, jogging tier)
+ * Walk/run classifier — v12 (cadence-backed run→walk gate)
  *
- * What v10 got wrong (June 18 session, 6,260 steps):
- * The user ran continuously from step ~486 to ~5043, but the run included slow
- * UPHILL stretches where GPS speed sagged to 1.43–1.66 m/s — straight into the band
- * that overlaps brisk walking. Because v10 used GPS speed as the SOLE primary signal
- * (run→walk below RUN_EXIT = 1.7), it chopped the single run into three false walking
- * blips. The smoking gun: at step 4034 cadence was 208 SPM with 10/10 "running" votes
- * — the gait signal was certain it was running — yet speed (1.43) forced WALKING.
- * Speed alone cannot separate slow uphill running from brisk walking; gait can.
+ * v11 added an accelerometer impact gait gate so slow uphill running isn't
+ * forced to WALKING by GPS dips. Logs from 2026-08-23 still showed long false
+ * walking segments at ~186 SPM: impact baselines often aren't ready early in a
+ * session, so gaitSaysRunning stayed false and speed alone still flipped run→walk.
  *
- * Design (changes from v10 in CAPS):
- * 1. PRIMARY SIGNAL = GPS speed, smoothed by a 1-D Kalman filter (random-walk model),
- *    updated once per fix in updateGpsSpeed().
+ * v12: a run/jog → walk transition also requires cadence to look like walking.
+ * High SPM / run-majority votes keep the running family even when GPS sags and
+ * gait baselines aren't learned yet.
  *
- * 2. HYSTERESIS BAND on filtered speed: walk→run above RUN_ENTER_MPS (1.9),
- *    run→walk below RUN_EXIT_MPS (1.7).
- *
- * 3. ACCELEROMETER GAIT GATE (the v11 fix): we track each step's PEAK impact
- *    magnitude (running has a flight phase → harder vertical impact than walking,
- *    independent of forward speed). The walk and run impact levels are learned
- *    ONLINE from moments when GPS speed is unambiguous (clearly walking / clearly
- *    running), so no manual calibration is needed. A run→walk switch is only allowed
- *    when the impact has ALSO dropped to walking level. If speed dips but impact is
- *    still running-like (uphill jog), the activity HOLDS as running.
- *
- * 4. JOGGING is a FULL activity state (not just a label). The walk↔run boundary is
- *    still the hard problem (gait + speed); within the running family the speed is
- *    split into JOGGING (slow / uphill) and RUNNING (fast) with its own hysteresis
- *    band (JOG_RUN_ENTER / JOG_RUN_EXIT). Any change between the three states is
- *    committed through the same leaky-bucket dwell, so jog↔run doesn't churn.
- *
- * 5. IN-PLACE HOLD: filtered speed below LOW_WALK_MPS (0.8) = stopped / running in
- *    place (e.g. at a light) → hold current activity, never flip to walking.
- *
- * 6. LEAKY-BUCKET DWELL (8 s): switch evidence accumulates and DECAYS when it
- *    reverses, riding through brief GPS noise instead of hard-resetting.
- *
- * 7. CADENCE FALLBACK when no fresh GPS fix is available.
- *
- * The peak impact and learned baselines are written to the debug CSV so the gait
- * thresholds can be validated/tuned against the next real session.
+ * Still uses: GPS Kalman primary signal, hysteresis, impact gait when ready,
+ * in-place hold, leaky-bucket dwell, cadence fallback without GPS.
  */
 class StepDetector(private val listener: StepListener) : SensorEventListener {
 
@@ -216,6 +187,20 @@ class StepDetector(private val listener: StepListener) : SensorEventListener {
     private val gaitSaysRunning: Boolean
         get() = gaitSeparationReady && recentImpact >= (walkImpactEwma + runImpactEwma) / 2.0
 
+    /** Cadence still looks like the running family (votes + instantaneous SPM). */
+    private val cadenceSaysRunning: Boolean
+        get() = runVoteCount >= 5 || currentSpm >= CLASSIFY_SPM
+
+    /**
+     * Allow run/jog → walk only when BOTH speed says walk AND neither gait nor
+     * cadence still insist on running. Prevents GPS-dip false walks while jogging.
+     */
+    private fun allowRunToWalk(filtered: Double): Boolean {
+        if (filtered >= RUN_EXIT_MPS) return false
+        if (gaitSaysRunning || cadenceSaysRunning) return false
+        return true
+    }
+
     private fun isRunningFamily(a: ActivityType) =
         a == ActivityType.JOGGING || a == ActivityType.RUNNING
 
@@ -345,16 +330,16 @@ class StepDetector(private val listener: StepListener) : SensorEventListener {
                             else ActivityType.WALKING
                         // Running family (JOGGING / RUNNING):
                         else -> {
-                            // Speed says walk — but only believe it if the GAIT also dropped to
-                            // walking level. Running-like impact at low speed = uphill / slow jog,
-                            // so stay in the running family (the v11 fix for the false walk blips).
-                            if (filtered < RUN_EXIT_MPS && !gaitSaysRunning) ActivityType.WALKING
+                            // Speed says walk — only believe it when gait AND cadence also
+                            // look like walking (v12). High SPM at low GPS = uphill / slow jog.
+                            if (allowRunToWalk(filtered)) ActivityType.WALKING
                             else runningTierFor(currentActivity, filtered)
                         }
                     }
                     decisionReason = when {
                         desired == currentActivity && isRunningFamily(currentActivity) &&
-                            filtered < RUN_EXIT_MPS && gaitSaysRunning -> "hold_gait_jog"
+                            filtered < RUN_EXIT_MPS && (gaitSaysRunning || cadenceSaysRunning) ->
+                            if (gaitSaysRunning) "hold_gait_jog" else "hold_cadence_jog"
                         desired == currentActivity -> "stable"
                         else -> "dwell_pending"
                     }
@@ -363,9 +348,11 @@ class StepDetector(private val listener: StepListener) : SensorEventListener {
                 signalSource = "cadence_fallback"
                 // Without GPS, cadence can only separate walk vs running-family (not jog
                 // vs run), so running-family is represented as JOGGING and held as-is.
+                // Require clear walk cadence (not just majority) before leaving a run.
                 desired = when (currentActivity) {
-                    ActivityType.WALKING -> if (runVoteCount  >= VOTES_TO_RUN)  ActivityType.JOGGING else ActivityType.WALKING
-                    else                 -> if (walkVoteCount >= VOTES_TO_WALK) ActivityType.WALKING else currentActivity
+                    ActivityType.WALKING -> if (runVoteCount >= VOTES_TO_RUN) ActivityType.JOGGING else ActivityType.WALKING
+                    else -> if (walkVoteCount >= VOTES_TO_WALK && !cadenceSaysRunning)
+                        ActivityType.WALKING else currentActivity
                 }
                 decisionReason = if (desired == currentActivity) "stable_cadence" else "dwell_pending_cadence"
             }

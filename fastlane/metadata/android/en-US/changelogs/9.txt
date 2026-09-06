@@ -1,0 +1,2 @@
+• Fix unrealistic step-length calibration (stricter detection + height check)
+• Keep jogging/running when GPS dips but cadence stays high
