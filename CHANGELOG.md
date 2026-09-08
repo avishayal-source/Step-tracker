@@ -3,6 +3,18 @@
 All notable changes to Y Walk are documented here. Versions follow the app's
 `versionName` (and `versionCode` in parentheses).
 
+## 1.0.9 (10) — 2026-09-08
+
+Flexible Botty schedule: a missed workout is carried, not dropped.
+
+- Workouts have a status (pending / done / skipped); a passed date no longer hides them
+- Schedule tab loads the next *due* workout — today's, or the oldest still waiting
+- Completion is tracked by workout id, so a late session marks the right entry done
+- Botty overdue card: Do it now / Skip it / Shift my plan (pushes remaining sessions forward)
+- Backlog limits: retired after 3 days late, max 2 carried, always announced
+- Reminders rebuilt as one daily 18:00 plan check: day-before, overdue nudge, Sunday summary
+- Fix: reminders were lost on reboot / app update (added BootReceiver)
+
 ## 1.0.8 (9) — 2026-08-23
 
 Fix bad calibration strides and false walking during continuous runs.

@@ -26,6 +26,7 @@ class MainActivity : AppCompatActivity() {
 
     companion object {
         const val EXTRA_OPEN_SCHEDULE = "extra_open_schedule"
+        const val EXTRA_OPEN_COACH = "extra_open_coach"
     }
 
     private var service: StepTrackerService? = null
@@ -185,6 +186,16 @@ class MainActivity : AppCompatActivity() {
         coachView = CoachView(this, pageCoach)
         coachView.setup()
         coachView.onPlanActivated = { tabLayout.getTabAt(1)?.select() }
+        coachView.onOpenWorkout = { workoutId ->
+            tabLayout.getTabAt(1)?.select()
+            tabLayout.post { scheduleView.loadPlannedWorkout(workoutId) }
+        }
+
+        // Existing plans were scheduled with per-workout alarms; make sure the daily
+        // plan check is armed for them too (also covers alarms lost to an app update).
+        if (TrainingPlanStore(this).hasActivePlan()) {
+            WorkoutReminderReceiver.ensureDailyCheck(this)
+        }
         pageCoach.findViewById<View>(R.id.btnPrivacyPolicy).setOnClickListener {
             startActivity(LegalDocActivity.privacy(this))
         }
@@ -243,10 +254,12 @@ class MainActivity : AppCompatActivity() {
         handleIntentExtras(intent)
     }
 
-    /** Open the Schedule tab (and load today's workout) when launched from a reminder. */
+    /** Open the tab a reminder notification points at: Schedule for workouts, Botty for the weekly summary. */
     private fun handleIntentExtras(intent: Intent?) {
         if (intent?.getBooleanExtra(EXTRA_OPEN_SCHEDULE, false) == true) {
             tabLayout.post { tabLayout.getTabAt(1)?.select() }
+        } else if (intent?.getBooleanExtra(EXTRA_OPEN_COACH, false) == true) {
+            tabLayout.post { tabLayout.getTabAt(3)?.select() }
         }
     }
 

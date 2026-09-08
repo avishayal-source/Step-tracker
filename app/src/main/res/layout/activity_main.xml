@@ -707,6 +707,78 @@ Start a tracking session to build your history."
                     android:lineSpacingMultiplier="1.45"
                     android:background="@drawable/bg_surface_card" />
 
+                <!-- Overdue backlog: missed workouts stay here until done, skipped or retired -->
+                <LinearLayout
+                    android:id="@+id/bottyOverdueCard"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:layout_marginTop="16dp"
+                    android:padding="14dp"
+                    android:background="@drawable/bg_surface_card"
+                    android:visibility="gone">
+
+                    <TextView
+                        android:id="@+id/tvBottyOverdueHeader"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="@string/botty_overdue_label"
+                        android:textSize="12sp"
+                        android:letterSpacing="0.1"
+                        android:textColor="@color/text_secondary"
+                        android:fontFamily="sans-serif-medium" />
+
+                    <TextView
+                        android:id="@+id/tvBottyOverdue"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:textSize="13sp"
+                        android:textColor="@color/text_primary"
+                        android:lineSpacingMultiplier="1.5" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/btnBottyDoOverdue"
+                        android:layout_width="match_parent"
+                        android:layout_height="44dp"
+                        android:layout_marginTop="12dp"
+                        android:text="@string/botty_overdue_do_now"
+                        android:textSize="13sp"
+                        app:cornerRadius="22dp"
+                        android:backgroundTint="@color/accent" />
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:layout_marginTop="6dp">
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnBottySkipOverdue"
+                            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                            android:layout_width="0dp"
+                            android:layout_weight="1"
+                            android:layout_height="44dp"
+                            android:layout_marginEnd="4dp"
+                            android:text="@string/botty_overdue_skip"
+                            android:textSize="12sp"
+                            app:cornerRadius="22dp"
+                            app:strokeColor="@color/accent" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnBottyShiftPlan"
+                            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                            android:layout_width="0dp"
+                            android:layout_weight="1"
+                            android:layout_height="44dp"
+                            android:layout_marginStart="4dp"
+                            android:text="@string/botty_overdue_shift"
+                            android:textSize="12sp"
+                            app:cornerRadius="22dp"
+                            app:strokeColor="@color/accent" />
+                    </LinearLayout>
+                </LinearLayout>
+
                 <TextView
                     android:id="@+id/tvBottyWeekHeader"
                     android:layout_width="wrap_content"

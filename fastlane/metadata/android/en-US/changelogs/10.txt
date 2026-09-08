@@ -1,0 +1,4 @@
+• Missed workouts stay on your schedule instead of disappearing
+• Botty nudges you when you're behind, plus a weekly progress summary
+• Skip a session or shift the whole plan forward when life gets in the way
+• Reminders now survive a phone restart

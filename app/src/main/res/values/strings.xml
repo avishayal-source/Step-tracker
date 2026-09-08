@@ -40,6 +40,10 @@
     <string name="botty_view_full_plan">View full plan</string>
     <string name="botty_change_goal">Change goal</string>
     <string name="botty_go_schedule">Open today in Schedule</string>
+    <string name="botty_overdue_label">⏰ STILL WAITING</string>
+    <string name="botty_overdue_do_now">Do it now</string>
+    <string name="botty_overdue_skip">Skip it</string>
+    <string name="botty_overdue_shift">Shift my plan</string>
     <string name="botty_plan_summary_label">YOUR PLAN AT A GLANCE</string>
     <string name="botty_milestone_label">MILESTONE</string>
     <string name="health_disclaimer">Not medical advice. Botty uses on-device rules based on general training principles. Consult a doctor before starting a new exercise programme. Stop if you feel pain, dizziness, or chest discomfort.</string>

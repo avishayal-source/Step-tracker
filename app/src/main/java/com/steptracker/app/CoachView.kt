@@ -35,6 +35,9 @@ class CoachView(
 
     var onPlanActivated: (() -> Unit)? = null
 
+    /** Asks the host to open the Schedule tab loaded with a specific planned workout. */
+    var onOpenWorkout: ((Long) -> Unit)? = null
+
     private var lastResult: RunPlanCoach.Result? = null
     private var lastProfile: RunPlanCoach.Profile? = null
     private var lastGoal: RunPlanCoach.Goal? = null
@@ -73,6 +76,11 @@ class CoachView(
     private lateinit var tvBottyMilestone: TextView
     private lateinit var tvBottyWeekHeader: TextView
     private lateinit var tvBottyWeekWorkouts: TextView
+    private lateinit var overdueCard: View
+    private lateinit var tvBottyOverdue: TextView
+    private lateinit var btnBottyDoOverdue: MaterialButton
+    private lateinit var btnBottySkipOverdue: MaterialButton
+    private lateinit var btnBottyShiftPlan: MaterialButton
     private lateinit var btnBottyGoSchedule: MaterialButton
     private lateinit var btnBottyViewFullPlan: MaterialButton
     private lateinit var btnBottyChangeGoal: MaterialButton
@@ -108,6 +116,11 @@ class CoachView(
         tvBottyMilestone = root.findViewById(R.id.tvBottyMilestone)
         tvBottyWeekHeader = root.findViewById(R.id.tvBottyWeekHeader)
         tvBottyWeekWorkouts = root.findViewById(R.id.tvBottyWeekWorkouts)
+        overdueCard = root.findViewById(R.id.bottyOverdueCard)
+        tvBottyOverdue = root.findViewById(R.id.tvBottyOverdue)
+        btnBottyDoOverdue = root.findViewById(R.id.btnBottyDoOverdue)
+        btnBottySkipOverdue = root.findViewById(R.id.btnBottySkipOverdue)
+        btnBottyShiftPlan = root.findViewById(R.id.btnBottyShiftPlan)
         btnBottyGoSchedule = root.findViewById(R.id.btnBottyGoSchedule)
         btnBottyViewFullPlan = root.findViewById(R.id.btnBottyViewFullPlan)
         btnBottyChangeGoal = root.findViewById(R.id.btnBottyChangeGoal)
@@ -119,6 +132,9 @@ class CoachView(
         btnBottyGoSchedule.setOnClickListener { onPlanActivated?.invoke() }
         btnBottyViewFullPlan.setOnClickListener { showActiveFullPlan() }
         btnBottyChangeGoal.setOnClickListener { confirmChangeGoal() }
+        btnBottyDoOverdue.setOnClickListener { doOldestOverdue() }
+        btnBottySkipOverdue.setOnClickListener { confirmSkipOldestOverdue() }
+        btnBottyShiftPlan.setOnClickListener { confirmShiftPlan() }
 
         enableScrollToFocusedFields()
         refreshMode()
@@ -192,7 +208,7 @@ class CoachView(
 
     /** Call when the Botty tab is selected — refreshes the current program week. */
     fun onTabVisible() {
-        refreshMode()
+        refreshMode(announceRetired = true)
     }
 
     /** Reload coach form + active-plan panels after a backup restore. */
@@ -201,10 +217,20 @@ class CoachView(
         refreshMode()
     }
 
-    private fun refreshMode() {
-        val plan = planStore.load()
+    private fun refreshMode(announceRetired: Boolean = false) {
+        val reconciled = planStore.loadReconciled()
+        val plan = reconciled?.plan
         if (plan != null && plan.workouts.isNotEmpty()) {
             showActivePlan(plan)
+            if (announceRetired && reconciled.changed) {
+                PlanHygiene.retiredMessage(reconciled.retired)?.let { msg ->
+                    AlertDialog.Builder(activity)
+                        .setTitle("Plan tidied up")
+                        .setMessage(msg)
+                        .setPositiveButton("Got it", null)
+                        .show()
+                }
+            }
         } else {
             showIntakeMode()
         }
@@ -229,7 +255,7 @@ class CoachView(
         tvBottyGoalLabel.text = plan.goalLabel
 
         tvBottySummary.text = plan.summaryOneLiner.ifBlank {
-            "${plan.goalLabel} · ${plan.workouts.count { !it.done }} workouts remaining"
+            "${plan.goalLabel} · ${plan.workouts.count { it.pending }} workouts remaining"
         }
 
         if (plan.milestoneTeaser.isNotBlank()) {
@@ -249,18 +275,101 @@ class CoachView(
             "No workouts this week — you're caught up or between phases."
         } else {
             weekWorkouts.joinToString("\n\n") { w ->
-                val mark = if (w.done) "✅" else "○"
+                val mark = when {
+                    w.done -> "✅"
+                    w.status == WorkoutStatus.SKIPPED -> "⏭"
+                    w.isOverdue(now) -> "⏰"
+                    else -> "○"
+                }
                 "$mark ${w.dateLabel}\n   ${w.title}"
             }
         }
 
+        renderOverdue(plan, now)
+
         val next = planStore.nextWorkout(plan, now)
-        btnBottyGoSchedule.text = if (next != null && next.isSameDay(now))
-            activity.getString(R.string.botty_go_schedule)
-        else if (next != null)
-            "Next: ${next.dateLabel}"
-        else
-            "All workouts complete 🎉"
+        btnBottyGoSchedule.text = when {
+            next == null -> "All workouts complete 🎉"
+            next.isOverdue(now) || next.isSameDay(now) ->
+                activity.getString(R.string.botty_go_schedule)
+            else -> "Next: ${next.dateLabel}"
+        }
+    }
+
+    /**
+     * Missed workouts are not dropped when their day passes — they collect here until the
+     * user does them, skips them, or [PlanHygiene] retires them.
+     */
+    private fun renderOverdue(plan: TrainingPlan, now: Long) {
+        val overdue = plan.overdueWorkouts(now)
+        if (overdue.isEmpty()) {
+            overdueCard.visibility = View.GONE
+            return
+        }
+        overdueCard.visibility = View.VISIBLE
+
+        val oldest = overdue.first()
+        val list = overdue.joinToString("\n") { w -> "• ${w.title} — ${w.dueLabel(now)}" }
+        val graceLeft = (PlanHygiene.GRACE_DAYS - oldest.daysLate(now)).coerceAtLeast(0)
+        val note = if (graceLeft <= 0) {
+            "Botty lets these go after today — do one or skip it."
+        } else {
+            "Stays on your schedule for $graceLeft more day${if (graceLeft == 1) "" else "s"}. " +
+                "Don't double up to catch up."
+        }
+        tvBottyOverdue.text = "$list\n\n$note"
+
+        btnBottyDoOverdue.text = "Do it now — ${oldest.title}"
+        btnBottyShiftPlan.isEnabled = oldest.daysLate(now) > 0
+    }
+
+    private fun oldestOverdue(now: Long = System.currentTimeMillis()): PlannedWorkout? =
+        planStore.load()?.overdueWorkouts(now)?.firstOrNull()
+
+    private fun doOldestOverdue() {
+        val target = oldestOverdue() ?: run { refreshMode(); return }
+        onOpenWorkout?.invoke(target.id)
+    }
+
+    private fun confirmSkipOldestOverdue() {
+        val target = oldestOverdue() ?: run { refreshMode(); return }
+        AlertDialog.Builder(activity)
+            .setTitle("Skip this workout?")
+            .setMessage(
+                "${target.title} (${target.dateLabel}) will be dropped from your plan.\n\n" +
+                    "Skipping one session is fine — the rest of your plan stays as it is."
+            )
+            .setPositiveButton("Skip it") { _, _ ->
+                planStore.markSkipped(target.id)
+                refreshMode()
+                Toast.makeText(activity, "Dropped: ${target.title}", Toast.LENGTH_SHORT).show()
+            }
+            .setNegativeButton("Keep it", null)
+            .show()
+    }
+
+    private fun confirmShiftPlan() {
+        val plan = planStore.load() ?: return
+        val oldest = plan.overdueWorkouts().firstOrNull() ?: return
+        val days = oldest.daysLate()
+        if (days <= 0) return
+        AlertDialog.Builder(activity)
+            .setTitle("Shift your plan?")
+            .setMessage(
+                "Botty will move ${oldest.title} to today and push every remaining session " +
+                    "forward by $days day${if (days == 1) "" else "s"}.\n\n" +
+                    "Your target date moves out by the same amount — nothing gets compressed."
+            )
+            .setPositiveButton("Shift it") { _, _ ->
+                val shifted = planStore.shiftPlanToToday()
+                if (shifted != null) {
+                    WorkoutReminderReceiver.scheduleAll(activity, shifted)
+                    refreshMode()
+                    Toast.makeText(activity, "Plan shifted by $days day(s)", Toast.LENGTH_LONG).show()
+                }
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
     }
 
     private fun evaluate() {
@@ -481,7 +590,8 @@ class CoachView(
                 "${plan.workouts.size} workouts over ${presentation.totalWeeks} weeks.\n\n" +
                 presentation.oneLiner + "\n\n" +
                 (first?.let { "First workout: ${it.title} on ${it.dateLabel}.\n\n" } ?: "") +
-                "Botty will remind you at 6 PM the day before each session."
+                "Botty will remind you at 6 PM the day before each session. Miss one and it " +
+                "stays on your schedule for up to ${PlanHygiene.GRACE_DAYS} days — Botty will nudge you."
             )
             .setPositiveButton("Go to Schedule") { _, _ -> onPlanActivated?.invoke() }
             .setNegativeButton("OK", null)

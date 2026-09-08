@@ -55,9 +55,10 @@ class ScheduleEmbeddedView(
         private set
     private var inPrepCountdown = false
 
-    // True when the currently loaded schedule is today's planned workout, so it can
-    // be marked done in the training plan once completed.
-    private var loadedFromPlanToday = false
+    // Id of the planned workout currently loaded in the editor. Tracking the id (rather
+    // than just "is it today's") means an overdue session loaded days late still gets
+    // marked done against the right entry in the plan.
+    private var loadedPlanWorkoutId: Long? = null
 
     fun setup() {
         scheduleManager = ScheduleManager(this)
@@ -135,26 +136,46 @@ class ScheduleEmbeddedView(
     }
 
     /**
-     * If the active training plan has a not-done workout for today, load its periods
-     * (warmup + main + cooldown) into the editor. Safe to call repeatedly: it does
-     * nothing while a schedule is running or when the editor already has periods,
-     * so it never clobbers the user's manual edits.
+     * Loads the next due workout from the active plan — today's, or the oldest one still
+     * waiting from an earlier day — into the editor as warmup + main + cooldown periods.
+     * Safe to call repeatedly: it does nothing while a schedule is running or when the
+     * editor already has periods, so it never clobbers the user's manual edits.
      */
     fun loadTodaysPlannedWorkout(showToastIfNone: Boolean = false) {
         if (isRunning || inPrepCountdown) return
         if (schedule.isNotEmpty()) return
-        val plan = planStore.load()
-        val today = plan?.let { planStore.todaysPendingWorkout(it) }
-        if (today == null) {
-            if (showToastIfNone) Toast.makeText(activity, "No workout scheduled for today", Toast.LENGTH_SHORT).show()
+        val plan = planStore.loadReconciled()?.plan
+        val due = plan?.let { planStore.nextDueWorkout(it) }
+        if (due == null) {
+            if (showToastIfNone) Toast.makeText(activity, "No workout waiting right now", Toast.LENGTH_SHORT).show()
             return
         }
+        applyPlannedWorkout(due)
+    }
+
+    /** Loads a specific planned workout, e.g. when Botty's overdue card says "Do it now". */
+    fun loadPlannedWorkout(workoutId: Long): Boolean {
+        if (isRunning || inPrepCountdown) {
+            Toast.makeText(activity, "Finish the running schedule first", Toast.LENGTH_SHORT).show()
+            return false
+        }
+        val target = planStore.load()?.findWorkout(workoutId) ?: return false
+        applyPlannedWorkout(target)
+        return true
+    }
+
+    private fun applyPlannedWorkout(w: PlannedWorkout) {
         schedule.clear()
-        schedule.addAll(today.items.map { it.copy(state = ScheduleState.PENDING) })
+        schedule.addAll(w.items.map { it.copy(state = ScheduleState.PENDING) })
         scheduleAdapter.notifyDataSetChanged()
         refreshTotals()
-        loadedFromPlanToday = true
-        Toast.makeText(activity, "📅 Loaded today's workout: ${today.title}", Toast.LENGTH_LONG).show()
+        loadedPlanWorkoutId = w.id
+        val msg = if (w.isOverdue()) {
+            "⏰ Loaded workout from ${w.dateLabel}: ${w.title}"
+        } else {
+            "📅 Loaded today's workout: ${w.title}"
+        }
+        Toast.makeText(activity, msg, Toast.LENGTH_LONG).show()
     }
 
     /** Called when activity is destroyed — persist run state; do not cancel the schedule timer goal. */
@@ -227,7 +248,7 @@ class ScheduleEmbeddedView(
                 schedule.addAll(chosen.items.map { it.copy(state = ScheduleState.PENDING) })
                 scheduleAdapter.notifyDataSetChanged()
                 refreshTotals()
-                loadedFromPlanToday = false
+                loadedPlanWorkoutId = null
                 Toast.makeText(activity, "Loaded: ${chosen.name}", Toast.LENGTH_SHORT).show()
             }
             .setNeutralButton("Delete…") { _, _ -> showDeleteDialog(saved) }
@@ -317,9 +338,9 @@ class ScheduleEmbeddedView(
             scheduleAdapter.setRunningMode(false); scheduleAdapter.setActiveIndex(-1)
             scheduleAdapter.notifyDataSetChanged()
             stopStepTracking()
-            if (loadedFromPlanToday) {
-                planStore.markTodayDone()
-                loadedFromPlanToday = false
+            loadedPlanWorkoutId?.let { id ->
+                planStore.markDone(id)
+                loadedPlanWorkoutId = null
             }
             Toast.makeText(activity, "🎉 Schedule complete!", Toast.LENGTH_LONG).show()
         }

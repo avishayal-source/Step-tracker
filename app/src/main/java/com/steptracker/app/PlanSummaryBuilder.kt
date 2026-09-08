@@ -90,7 +90,12 @@ object PlanSummaryBuilder {
         for ((week, workouts) in byWeek) {
             sb.append("Week $week\n")
             for (w in workouts.sortedBy { it.dateMs }) {
-                val status = if (w.done) " ✓" else ""
+                val status = when {
+                    w.done -> " ✓"
+                    w.status == WorkoutStatus.SKIPPED -> " (skipped)"
+                    w.isOverdue() -> " (still waiting)"
+                    else -> ""
+                }
                 sb.append("  • ${w.dateLabel}: ${w.title}$status\n")
             }
             sb.append('\n')
