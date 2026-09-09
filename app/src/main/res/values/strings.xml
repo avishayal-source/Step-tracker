@@ -40,6 +40,11 @@
     <string name="botty_view_full_plan">View full plan</string>
     <string name="botty_change_goal">Change goal</string>
     <string name="botty_go_schedule">Open today in Schedule</string>
+    <string name="audio_settings_title">Sounds &amp; voice</string>
+    <string name="audio_settings_sound">Whistle cue on walk/run changes</string>
+    <string name="audio_settings_voice">Spoken progress during a workout</string>
+    <string name="audio_settings_test">Test whistle</string>
+
     <string name="botty_overdue_label">⏰ STILL WAITING</string>
     <string name="botty_overdue_do_now">Do it now</string>
     <string name="botty_overdue_skip">Skip it</string>

@@ -1,0 +1,5 @@
+• Plan title now shows the real plan length, not the length you asked for
+• Softer coach's-whistle cues that follow media volume and duck your music
+• Spoken progress during a workout ("you're halfway there")
+• The next session loads as soon as you finish the last one
+• New Sounds & voice settings in the ⋮ menu

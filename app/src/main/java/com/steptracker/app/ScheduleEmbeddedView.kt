@@ -60,8 +60,15 @@ class ScheduleEmbeddedView(
     // marked done against the right entry in the plan.
     private var loadedPlanWorkoutId: Long? = null
 
+    // Set when the loaded workout was pulled in ahead of its scheduled day.
+    private var loadedAheadOfSchedule = false
+
+    private lateinit var voice: VoiceCoach
+    private val spokenMarkers = mutableSetOf<Int>()
+
     fun setup() {
-        scheduleManager = ScheduleManager(this)
+        scheduleManager = ScheduleManager(activity, this)
+        voice = VoiceCoach(activity)
         store = ScheduleStore(activity)
         runPersistence = ScheduleRunPersistence(activity)
         planStore = TrainingPlanStore(activity)
@@ -118,6 +125,8 @@ class ScheduleEmbeddedView(
                     schedule.removeAt(pos)
                     scheduleAdapter.notifyItemRemoved(pos)
                     refreshTotals()
+                    // Cleared out a preloaded session: let it come back on its own day.
+                    if (schedule.isEmpty()) dismissLoadedPreview()
                 }
             }
         }).attachToRecyclerView(rvSchedule)
@@ -145,12 +154,27 @@ class ScheduleEmbeddedView(
         if (isRunning || inPrepCountdown) return
         if (schedule.isNotEmpty()) return
         val plan = planStore.loadReconciled()?.plan
+        // Nothing due today or overdue? Offer tomorrow's — including one that was
+        // previously pushed away, which is why it comes back the day before.
         val due = plan?.let { planStore.nextDueWorkout(it) }
+            ?: plan?.let { planStore.previewWorkout(it, maxDaysAhead = 1) }
         if (due == null) {
             if (showToastIfNone) Toast.makeText(activity, "No workout waiting right now", Toast.LENGTH_SHORT).show()
             return
         }
         applyPlannedWorkout(due)
+    }
+
+    /**
+     * After finishing a session, queue up the next one so it's ready to go rather than
+     * appearing only the day before. Capped at [PRELOAD_WINDOW_DAYS] so a session a week
+     * out doesn't sit in the editor going stale.
+     */
+    private fun preloadNextWorkout() {
+        if (isRunning || inPrepCountdown) return
+        val plan = planStore.load() ?: return
+        val next = planStore.previewWorkout(plan, maxDaysAhead = PRELOAD_WINDOW_DAYS) ?: return
+        applyPlannedWorkout(next)
     }
 
     /** Loads a specific planned workout, e.g. when Botty's overdue card says "Do it now". */
@@ -170,18 +194,34 @@ class ScheduleEmbeddedView(
         scheduleAdapter.notifyDataSetChanged()
         refreshTotals()
         loadedPlanWorkoutId = w.id
-        val msg = if (w.isOverdue()) {
-            "⏰ Loaded workout from ${w.dateLabel}: ${w.title}"
-        } else {
-            "📅 Loaded today's workout: ${w.title}"
+        val daysUntil = -w.daysLate()
+        loadedAheadOfSchedule = daysUntil > 0
+        val msg = when {
+            w.isOverdue() -> "⏰ Loaded workout from ${w.dateLabel}: ${w.title}"
+            daysUntil == 1 -> "📅 Up next, tomorrow: ${w.title}"
+            daysUntil > 1 -> "📅 Up next, ${w.dateLabel}: ${w.title}"
+            else -> "📅 Loaded today's workout: ${w.title}"
         }
         Toast.makeText(activity, msg, Toast.LENGTH_LONG).show()
+    }
+
+    /**
+     * The user replaced a workout that was loaded ahead of its day. It stays in the plan
+     * and comes back on its own the day before, so nothing is lost by clearing it.
+     */
+    private fun dismissLoadedPreview() {
+        val id = loadedPlanWorkoutId ?: return
+        if (!loadedAheadOfSchedule) return
+        planStore.dismissPreview(id)
+        loadedPlanWorkoutId = null
+        loadedAheadOfSchedule = false
     }
 
     /** Called when activity is destroyed — persist run state; do not cancel the schedule timer goal. */
     fun onActivityDestroy() {
         if (isRunning || inPrepCountdown) persistRunState()
         if (isBound) activity.unbindService(serviceConn)
+        voice.shutdown()
     }
 
     /** User explicitly stopped the schedule. */
@@ -244,11 +284,13 @@ class ScheduleEmbeddedView(
         AlertDialog.Builder(activity).setTitle("Load schedule")
             .setItems(names) { _, i ->
                 val chosen = saved[i]
+                dismissLoadedPreview()
                 schedule.clear()
                 schedule.addAll(chosen.items.map { it.copy(state = ScheduleState.PENDING) })
                 scheduleAdapter.notifyDataSetChanged()
                 refreshTotals()
                 loadedPlanWorkoutId = null
+                loadedAheadOfSchedule = false
                 Toast.makeText(activity, "Loaded: ${chosen.name}", Toast.LENGTH_SHORT).show()
             }
             .setNeutralButton("Delete…") { _, _ -> showDeleteDialog(saved) }
@@ -276,6 +318,7 @@ class ScheduleEmbeddedView(
             scheduleAdapter.setRunningMode(false); scheduleAdapter.notifyDataSetChanged()
         } else {
             if (schedule.isEmpty()) { Toast.makeText(activity,"Add at least one period first",Toast.LENGTH_SHORT).show(); return }
+            spokenMarkers.clear()
             inPrepCountdown = true
             layoutRunning.visibility = View.VISIBLE
             btnStartStop.text = "■  Stop"
@@ -316,7 +359,37 @@ class ScheduleEmbeddedView(
             }
             scheduleAdapter.setActiveIndex(periodIndex)
             persistRunState()
+            maybeSpeakProgress(periodIndex, remainingMs)
         }
+    }
+
+    /**
+     * Spoken progress at the quarter points of the whole session (not per period), so the
+     * cues scale with workout length. Short sessions stay silent — there's nothing useful
+     * to say every couple of minutes.
+     */
+    private fun maybeSpeakProgress(periodIndex: Int, remainingMs: Long) {
+        val items = scheduleManager.getItems()
+        if (periodIndex >= items.size) return
+        val totalMs = items.sumOf { it.durationMs }
+        if (totalMs < MIN_VOICE_SESSION_MS) return
+
+        val elapsedMs = items.take(periodIndex).sumOf { it.durationMs } +
+            (items[periodIndex].durationMs - remainingMs).coerceAtLeast(0L)
+        val pct = (elapsedMs * 100 / totalMs).toInt()
+
+        val due = VOICE_MARKERS.filter { pct >= it && it !in spokenMarkers }
+        if (due.isEmpty()) return
+        // Resuming mid-workout can cross several markers at once; only the latest is worth saying.
+        spokenMarkers.addAll(due)
+        voice.say(progressLine(due.max(), elapsedMs, totalMs))
+    }
+
+    private fun progressLine(marker: Int, elapsedMs: Long, totalMs: Long): String {
+        if (marker == 50) return "You're halfway there. Keep it up."
+        val doneMin = Math.round(elapsedMs / 60_000.0).toInt()
+        val totalMin = Math.round(totalMs / 60_000.0).toInt()
+        return "$doneMin of $totalMin minutes done."
     }
 
     override fun onPeriodComplete(completedIndex: Int, nextIndex: Int?) {
@@ -338,12 +411,41 @@ class ScheduleEmbeddedView(
             scheduleAdapter.setRunningMode(false); scheduleAdapter.setActiveIndex(-1)
             scheduleAdapter.notifyDataSetChanged()
             stopStepTracking()
-            loadedPlanWorkoutId?.let { id ->
+            spokenMarkers.clear()
+
+            val finished = loadedPlanWorkoutId?.let { id ->
+                val w = planStore.load()?.findWorkout(id)
                 planStore.markDone(id)
                 loadedPlanWorkoutId = null
+                loadedAheadOfSchedule = false
+                w
             }
+
             Toast.makeText(activity, "🎉 Schedule complete!", Toast.LENGTH_LONG).show()
+
+            if (finished != null && finished.daysLate() < 0) {
+                showAheadOfPlanNote(finished)
+            }
+            if (finished != null) preloadNextWorkout()
         }
+    }
+
+    /**
+     * Completing a session before its scheduled day is fine, but the plan's spacing exists
+     * for recovery — so say so, and leave the remaining dates where they are.
+     */
+    private fun showAheadOfPlanNote(w: PlannedWorkout) {
+        val daysEarly = -w.daysLate()
+        AlertDialog.Builder(activity)
+            .setTitle("You're ahead of plan")
+            .setMessage(
+                "${w.title} was scheduled for ${w.dateLabel} — you did it $daysEarly day" +
+                    "${if (daysEarly == 1) "" else "s"} early.\n\n" +
+                    "It's marked done and the rest of your plan keeps its dates. Take a recovery " +
+                    "day before the next session rather than pulling everything forward."
+            )
+            .setPositiveButton("Got it", null)
+            .show()
     }
 
     override fun onScheduleEdited() {
@@ -395,5 +497,15 @@ class ScheduleEmbeddedView(
         val m = TimeUnit.MILLISECONDS.toMinutes(ms)
         val s = TimeUnit.MILLISECONDS.toSeconds(ms) % 60
         return "%d:%02d".format(m, s)
+    }
+
+    companion object {
+        private val VOICE_MARKERS = listOf(25, 50, 75)
+
+        /** Below this, quarter-point cues would fire every few minutes for no benefit. */
+        private const val MIN_VOICE_SESSION_MS = 10 * 60_000L
+
+        /** How far ahead a finished-early preload may reach. */
+        const val PRELOAD_WINDOW_DAYS = 3
     }
 }

@@ -8,6 +8,11 @@
             android:id="@+id/action_restore_backup"
             android:title="@string/backup_restore" />
     </group>
+    <group android:id="@+id/group_audio">
+        <item
+            android:id="@+id/action_audio_settings"
+            android:title="@string/audio_settings_title" />
+    </group>
     <group android:id="@+id/group_legal">
         <item
             android:id="@+id/action_privacy"

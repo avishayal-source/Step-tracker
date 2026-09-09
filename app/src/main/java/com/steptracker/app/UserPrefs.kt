@@ -24,6 +24,16 @@ class UserPrefs(context: Context) {
         get() = prefs.getFloat("height_cm", 0f)
         set(v) { prefs.edit().putFloat("height_cm", v).apply() }
 
+    /** Whistle cues on walk/run transitions. */
+    var soundCuesEnabled: Boolean
+        get() = prefs.getBoolean("sound_cues", true)
+        set(v) { prefs.edit().putBoolean("sound_cues", v).apply() }
+
+    /** Spoken progress cues at the quarter points of a workout. */
+    var voiceCuesEnabled: Boolean
+        get() = prefs.getBoolean("voice_cues", true)
+        set(v) { prefs.edit().putBoolean("voice_cues", v).apply() }
+
     companion object {
         /** Typical walk stride ≈ 41.5% of height. */
         fun expectedWalkStrideM(heightCm: Float): Double =

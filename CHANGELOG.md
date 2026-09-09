@@ -3,6 +3,20 @@
 All notable changes to Y Walk are documented here. Versions follow the app's
 `versionName` (and `versionCode` in parentheses).
 
+## 1.0.10 (11) — 2026-09-09
+
+Coaching feel: honest plan titles, gentler cues, spoken progress, earlier prep.
+
+- Fix plan title using the *requested* horizon ("10 km in 8 weeks" for an 11-week plan);
+  existing saved plans are relabelled on load
+- Transition cues rebuilt as a warbling coach's whistle (sine) instead of square-wave
+  bursts, on the media stream at moderate volume, ducking music instead of ignoring it
+- Voice cues via device TTS at 25 / 50 / 75 % of a session; skipped under 10 minutes
+- Next workout preloads into the Schedule tab right after you finish the previous one
+  (within 3 days); replacing it returns it to the plan and it comes back the day before
+- Finishing early marks the workout done and says you're ahead, leaving later dates alone
+- New "Sounds & voice" settings in the ⋮ menu with an audible whistle preview
+
 ## 1.0.9 (10) — 2026-09-08
 
 Flexible Botty schedule: a missed workout is carried, not dropped.

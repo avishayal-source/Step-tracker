@@ -1,10 +1,14 @@
 package com.steptracker.app
 
+import android.content.Context
 import android.media.*
 import android.os.CountDownTimer
 import kotlin.math.*
 
-class ScheduleManager(private val listener: Listener) {
+class ScheduleManager(
+    private val context: Context,
+    private val listener: Listener
+) {
 
     interface Listener {
         fun onTick(periodIndex: Int, remainingMs: Long)
@@ -153,94 +157,7 @@ class ScheduleManager(private val listener: Listener) {
     enum class SoundType { COUNTDOWN, TO_WALK, TO_RUN, COMPLETE }
 
     fun playSound(type: SoundType) {
-        Thread {
-            try { playWithAudioTrack(type) }
-            catch (_: Exception) {
-                try { playWithToneGenerator(type) } catch (_: Exception) {}
-            }
-        }.start()
-    }
-
-    private fun playWithAudioTrack(type: SoundType) {
-        when (type) {
-            SoundType.COUNTDOWN -> squareBurst(1200.0, 0.10)
-            SoundType.TO_WALK -> {
-                squareBurst(1400.0, 0.30); Thread.sleep(80)
-                squareBurst(600.0,  0.55)
-            }
-            SoundType.TO_RUN -> {
-                squareBurst(600.0,  0.20); Thread.sleep(60)
-                squareBurst(1000.0, 0.20); Thread.sleep(60)
-                squareBurst(1800.0, 0.55)
-            }
-            SoundType.COMPLETE -> {
-                squareBurst(600.0,  0.15); Thread.sleep(50)
-                squareBurst(800.0,  0.15); Thread.sleep(50)
-                squareBurst(1000.0, 0.15); Thread.sleep(50)
-                squareBurst(1400.0, 0.15); Thread.sleep(50)
-                squareBurst(1800.0, 0.60)
-            }
-        }
-    }
-
-    private fun squareBurst(freq: Double, durSec: Double, volume: Double = 0.95) {
-        val sr = 44100
-        val n  = (sr * durSec).toInt()
-        val buf = ShortArray(n)
-        val period = sr / freq
-        val attackSamples = (sr * 0.005).toInt()
-        val releaseSamples = (sr * 0.03).toInt()
-        for (i in 0 until n) {
-            val squareVal = if ((i % period.toInt()) < (period / 2).toInt()) 1.0 else -1.0
-            val env = when {
-                i < attackSamples            -> i.toDouble() / attackSamples
-                i >= n - releaseSamples      -> (n - i).toDouble() / releaseSamples
-                else                         -> 1.0
-            }
-            buf[i] = (env * squareVal * volume * Short.MAX_VALUE).toInt()
-                .coerceIn(Short.MIN_VALUE.toInt(), Short.MAX_VALUE.toInt()).toShort()
-        }
-        val minBuf = AudioTrack.getMinBufferSize(sr,
-            AudioFormat.CHANNEL_OUT_MONO, AudioFormat.ENCODING_PCM_16BIT)
-        val track = AudioTrack.Builder()
-            .setAudioAttributes(AudioAttributes.Builder()
-                .setUsage(AudioAttributes.USAGE_ALARM)
-                .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION).build())
-            .setAudioFormat(AudioFormat.Builder()
-                .setSampleRate(sr)
-                .setEncoding(AudioFormat.ENCODING_PCM_16BIT)
-                .setChannelMask(AudioFormat.CHANNEL_OUT_MONO).build())
-            .setBufferSizeInBytes(maxOf(buf.size * 2, minBuf))
-            .setTransferMode(AudioTrack.MODE_STATIC).build()
-        track.write(buf, 0, buf.size)
-        track.play()
-        Thread.sleep((durSec * 1000 + 50).toLong())
-        track.stop()
-        track.release()
-    }
-
-    private fun playWithToneGenerator(type: SoundType) {
-        val tg = ToneGenerator(AudioManager.STREAM_ALARM, ToneGenerator.MAX_VOLUME)
-        when (type) {
-            SoundType.COUNTDOWN -> {
-                tg.startTone(ToneGenerator.TONE_PROP_BEEP, 100); Thread.sleep(180)
-            }
-            SoundType.TO_WALK -> {
-                tg.startTone(ToneGenerator.TONE_CDMA_HIGH_PBX_L, 400); Thread.sleep(480)
-                tg.startTone(ToneGenerator.TONE_CDMA_LOW_PBX_L,  600); Thread.sleep(680)
-            }
-            SoundType.TO_RUN -> {
-                tg.startTone(ToneGenerator.TONE_CDMA_LOW_PBX_L,  220); Thread.sleep(280)
-                tg.startTone(ToneGenerator.TONE_CDMA_MED_PBX_L,  220); Thread.sleep(280)
-                tg.startTone(ToneGenerator.TONE_CDMA_HIGH_PBX_L, 500); Thread.sleep(580)
-            }
-            SoundType.COMPLETE -> {
-                tg.startTone(ToneGenerator.TONE_CDMA_LOW_PBX_L,   180); Thread.sleep(240)
-                tg.startTone(ToneGenerator.TONE_CDMA_MED_PBX_L,   180); Thread.sleep(240)
-                tg.startTone(ToneGenerator.TONE_CDMA_HIGH_PBX_L,  180); Thread.sleep(240)
-                tg.startTone(ToneGenerator.TONE_CDMA_HIGH_PBX_SSL, 800); Thread.sleep(880)
-            }
-        }
-        tg.release()
+        if (!UserPrefs(context).soundCuesEnabled) return
+        AudioCues.play(context, type)
     }
 }

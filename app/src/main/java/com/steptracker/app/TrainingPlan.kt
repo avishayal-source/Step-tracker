@@ -164,6 +164,23 @@ data class TrainingPlan(
     fun findWorkout(id: Long): PlannedWorkout? = workouts.firstOrNull { it.id == id }
 
     /**
+     * Plans saved before v1.0.10 labelled themselves with the *requested* horizon, so an
+     * 8-week request that Botty stretched to 11 still read "in 8 weeks". Rewrites the week
+     * count in the label to the real plan length; returns this unchanged when it matches.
+     */
+    fun withCorrectedGoalLabel(): TrainingPlan {
+        val match = GOAL_WEEKS.find(goalLabel) ?: return this
+        val labelled = match.groupValues[1].toIntOrNull() ?: return this
+        val actual = maxProgramWeek
+        if (labelled == actual) return this
+        val corrected = goalLabel.replaceRange(
+            match.range,
+            "in $actual week${if (actual == 1) "" else "s"}"
+        )
+        return copy(goalLabel = corrected)
+    }
+
+    /**
      * Moves every still-pending workout (and the plan start) forward by [days] so a user
      * who fell behind gets the remaining plan realigned instead of a growing backlog.
      * Completed and skipped workouts keep their original dates.
@@ -198,6 +215,8 @@ data class TrainingPlan(
     }
 
     companion object {
+        private val GOAL_WEEKS = Regex("""in (\d+) weeks?""")
+
         fun fromJson(o: JSONObject): TrainingPlan {
             val arr = o.getJSONArray("workouts")
             val workouts = (0 until arr.length()).map { PlannedWorkout.fromJson(arr.getJSONObject(it)) }

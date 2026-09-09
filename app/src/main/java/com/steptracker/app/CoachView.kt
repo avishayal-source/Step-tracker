@@ -578,6 +578,7 @@ class CoachView(
         val plan = PlanScheduler.generate(
             result, profile, goal, startMidnightMs, warmupMin, cooldownMin, presentation
         )
+        planStore.clearDismissedPreviews()
         planStore.save(plan)
         WorkoutReminderReceiver.scheduleAll(activity, plan)
 

@@ -13,17 +13,21 @@ import org.json.JSONObject
 class TrainingPlanStore(context: Context) {
     private val prefs = SecurePrefs.open(context, "training_plan")
     private val KEY = "active_plan"
+    private val KEY_DISMISSED = "dismissed_previews"
 
     fun load(): TrainingPlan? {
         val json = prefs.getString(KEY, null) ?: return null
-        return try { TrainingPlan.fromJson(JSONObject(json)) } catch (_: Exception) { null }
+        val plan = try { TrainingPlan.fromJson(JSONObject(json)) } catch (_: Exception) { return null }
+        val corrected = plan.withCorrectedGoalLabel()
+        if (corrected !== plan) save(corrected)
+        return corrected
     }
 
     fun save(plan: TrainingPlan) {
         prefs.edit().putString(KEY, plan.toJson().toString()).apply()
     }
 
-    fun clear() { prefs.edit().remove(KEY).apply() }
+    fun clear() { prefs.edit().remove(KEY).remove(KEY_DISMISSED).apply() }
 
     fun hasActivePlan(): Boolean = load() != null
 
@@ -45,6 +49,42 @@ class TrainingPlanStore(context: Context) {
     fun nextDueWorkout(plan: TrainingPlan, now: Long = System.currentTimeMillis()): PlannedWorkout? =
         plan.workouts.filter { it.pending && it.isSameDay(now) }.minByOrNull { it.dateMs }
             ?: plan.overdueWorkouts(now).firstOrNull()
+
+    /**
+     * The next workout to offer *ahead* of its day: earliest pending one falling within
+     * [maxDaysAhead]. A workout the user already pushed away is held back until the day
+     * before it's due, so dismissing a preload doesn't lose the session.
+     */
+    fun previewWorkout(
+        plan: TrainingPlan,
+        now: Long = System.currentTimeMillis(),
+        maxDaysAhead: Int
+    ): PlannedWorkout? {
+        val candidate = plan.pendingWorkouts().firstOrNull { w ->
+            val daysUntil = -w.daysLate(now)
+            daysUntil in 1..maxDaysAhead
+        } ?: return null
+        val daysUntil = -candidate.daysLate(now)
+        if (daysUntil > 1 && isPreviewDismissed(candidate.id)) return null
+        return candidate
+    }
+
+    /** Remembers that the user replaced a preloaded workout, so it isn't pushed at them again. */
+    fun dismissPreview(workoutId: Long) {
+        val ids = dismissedPreviews() + workoutId
+        prefs.edit().putString(KEY_DISMISSED, ids.joinToString(",")).apply()
+    }
+
+    fun isPreviewDismissed(workoutId: Long): Boolean = workoutId in dismissedPreviews()
+
+    fun clearDismissedPreviews() { prefs.edit().remove(KEY_DISMISSED).apply() }
+
+    private fun dismissedPreviews(): Set<Long> =
+        prefs.getString(KEY_DISMISSED, null)
+            ?.split(',')
+            ?.mapNotNull { it.trim().toLongOrNull() }
+            ?.toSet()
+            ?: emptySet()
 
     /** The earliest still-pending workout, overdue ones included. */
     fun nextWorkout(plan: TrainingPlan, now: Long = System.currentTimeMillis()): PlannedWorkout? =

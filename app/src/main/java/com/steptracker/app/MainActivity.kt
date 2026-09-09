@@ -236,6 +236,9 @@ class MainActivity : AppCompatActivity() {
                 R.id.action_restore_backup -> {
                     importBackupLauncher.launch(arrayOf("application/json", "text/plain", "*/*")); true
                 }
+                R.id.action_audio_settings -> {
+                    showAudioSettings(); true
+                }
                 R.id.action_privacy -> {
                     startActivity(LegalDocActivity.privacy(this)); true
                 }
@@ -246,6 +249,35 @@ class MainActivity : AppCompatActivity() {
             }
         }
         popup.show()
+    }
+
+    /** Toggles for the in-workout whistle cues and spoken progress, with an audible preview. */
+    private fun showAudioSettings() {
+        val labels = arrayOf(
+            getString(R.string.audio_settings_sound),
+            getString(R.string.audio_settings_voice)
+        )
+        val checked = booleanArrayOf(userPrefs.soundCuesEnabled, userPrefs.voiceCuesEnabled)
+
+        val dialog = androidx.appcompat.app.AlertDialog.Builder(this)
+            .setTitle(R.string.audio_settings_title)
+            .setMultiChoiceItems(labels, checked) { _, which, isChecked ->
+                checked[which] = isChecked
+            }
+            .setPositiveButton(android.R.string.ok) { _, _ ->
+                userPrefs.soundCuesEnabled = checked[0]
+                userPrefs.voiceCuesEnabled = checked[1]
+            }
+            .setNeutralButton(R.string.audio_settings_test, null)
+            .setNegativeButton(android.R.string.cancel, null)
+            .create()
+
+        // Wire the preview after show() so tapping it doesn't dismiss and discard the toggles.
+        dialog.setOnShowListener {
+            dialog.getButton(androidx.appcompat.app.AlertDialog.BUTTON_NEUTRAL)
+                .setOnClickListener { AudioCues.play(this, ScheduleManager.SoundType.TO_RUN) }
+        }
+        dialog.show()
     }
 
     override fun onNewIntent(intent: Intent) {

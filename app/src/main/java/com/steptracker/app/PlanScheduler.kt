@@ -86,7 +86,10 @@ object PlanScheduler {
         }
 
         workouts.sortBy { it.dateMs }
-        val goalLabel = "${fmt(goal.targetDistanceKm)} km in ${goal.horizonWeeks} weeks"
+        // Botty often stretches the requested horizon for safety, so the label has to
+        // describe the plan that was actually built — not what the user asked for.
+        val actualWeeks = (presentation?.totalWeeks ?: result.plan.size).coerceAtLeast(1)
+        val goalLabel = "${fmt(goal.targetDistanceKm)} km in $actualWeeks week${if (actualWeeks == 1) "" else "s"}"
         return TrainingPlan(
             createdMs = System.currentTimeMillis(),
             goalLabel = goalLabel,
