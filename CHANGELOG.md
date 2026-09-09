@@ -9,8 +9,11 @@ Coaching feel: honest plan titles, gentler cues, spoken progress, earlier prep.
 
 - Fix plan title using the *requested* horizon ("10 km in 8 weeks" for an 11-week plan);
   existing saved plans are relabelled on load
-- Transition cues rebuilt as a warbling coach's whistle (sine) instead of square-wave
-  bursts, on the media stream at moderate volume, ducking music instead of ignoring it
+- Transition cues rebuilt as a soft warbling coach's whistle (sine) instead of square-wave
+  bursts, on the media stream at moderate volume, ducking music instead of ignoring it.
+  Three notes per transition — rising to run, falling to walk — and four at the finish
+- Fix a latent buffer overrun in cue rendering: the PCM buffer was sized from
+  (tone + gap) truncated once, but filled from tone and gap truncated separately
 - Voice cues via device TTS at 25 / 50 / 75 % of a session; skipped under 10 minutes
 - Next workout preloads into the Schedule tab right after you finish the previous one
   (within 3 days); replacing it returns it to the plan and it comes back the day before
