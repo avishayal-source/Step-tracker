@@ -1,0 +1,5 @@
+• Cooldown walks are no longer counted as running
+• Walk/run split now ignores cadence when GPS shows it can't be right
+• A long stretch at walking pace always ends the run, whatever the sensors say
+• Calibration counts steps the same way workout tracking does
+• Fix being asked to recalibrate over and over with no way to succeed

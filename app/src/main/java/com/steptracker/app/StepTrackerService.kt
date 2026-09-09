@@ -369,6 +369,10 @@ class StepTrackerService : Service(), StepDetector.StepListener {
             recentImpact = sample.recentImpact,
             walkImpactBase = sample.walkImpactBase,
             runImpactBase = sample.runImpactBase,
+            peakMag = sample.peakMag,
+            impliedStepM = sample.impliedStepM,
+            cadenceTrusted = sample.cadenceTrusted,
+            slowStreakMs = sample.slowStreakMs,
             decisionReason = sample.decisionReason,
             previousActivity = sample.previousActivity,
             currentActivity = sample.currentActivity
@@ -396,6 +400,10 @@ class StepTrackerService : Service(), StepDetector.StepListener {
         recentImpact: Double,
         walkImpactBase: Double?,
         runImpactBase: Double?,
+        peakMag: Double = 0.0,
+        impliedStepM: Double? = null,
+        cadenceTrusted: Boolean = true,
+        slowStreakMs: Long = 0L,
         decisionReason: String,
         previousActivity: ActivityType,
         currentActivity: ActivityType
@@ -426,6 +434,10 @@ class StepTrackerService : Service(), StepDetector.StepListener {
                     "%.2f".format(Locale.US, recentImpact),
                     walkImpactBase?.let { "%.2f".format(Locale.US, it) } ?: "",
                     runImpactBase?.let { "%.2f".format(Locale.US, it) } ?: "",
+                    "%.2f".format(Locale.US, peakMag),
+                    impliedStepM?.let { "%.2f".format(Locale.US, it) } ?: "",
+                    cadenceTrusted,
+                    slowStreakMs,
                     decisionReason.replace(',', ';'),
                     previousActivity,
                     currentActivity,
@@ -487,6 +499,7 @@ class StepTrackerService : Service(), StepDetector.StepListener {
                         "signal_source,desired_activity,candidate,dwell_ms,dwell_required_ms," +
                         "cadence_run_votes,cadence_walk_votes," +
                         "recent_impact,walk_impact_base,run_impact_base," +
+                        "peak_mag,implied_step_m,cadence_trusted,slow_streak_ms," +
                         "decision_reason," +
                         "previous_activity,current_activity," +
                         "current_period,walk_steps,jog_steps,run_steps,total_steps," +

@@ -3,6 +3,32 @@
 All notable changes to Y Walk are documented here. Versions follow the app's
 `versionName` (and `versionCode` in parentheses).
 
+## 1.0.11 (12) — 2026-09-09
+
+Classifier v13: a walk after a run is recognised as a walk.
+
+- Fix a 3-minute cooldown walk being logged as running (reported as 3:12 walk / 40:47 run
+  for a 3 + 38 + 3 session). Peak detection registers about two steps per stride while
+  walking, so a 1.14 m/s walk read as 197 SPM, and v12's cadence veto — which blocks
+  run→walk while cadence looks like running — could never release
+- Cadence loses its vote when GPS shows the implied step length is impossible (< 0.50 m).
+  Untrusted cadence *holds* the run rather than releasing it, since the same over-count
+  appears during a slow jog and releasing there re-opens the v11 false-walk hole
+- Landing force outranks cadence, measured against the learned *walk* baseline rather than
+  the walk/run midpoint — the run baseline is learned from fast running, so a slow jog sits
+  under that midpoint and would read as walking
+- Safety valve: 40 unbroken seconds at ≤ 1.40 m/s ends the run regardless of any veto, so
+  the classifier can never be pinned in the running family again
+- Replayed against the 2026-09-08 session: 5:07 walk / 38:53 run against a true 6:00 /
+  38:00, with no false walks mid-run (was 3:12 / 40:47)
+- Calibration and workout tracking now share one step counter. Calibration used stricter
+  thresholds (2.4 / 300 ms vs 1.5 / 230 ms), so metres-per-step was measured against a
+  counter that wasn't the one used while tracking
+- Fix an inescapable recalibration loop: the app discarded any walk calibration under
+  0.55 m and the wizard refused to save one, but a correct result is near half the
+  anatomical stride, so no calibration could satisfy both
+- Debug CSV gains peak_mag, implied_step_m, cadence_trusted and slow_streak_ms
+
 ## 1.0.10 (11) — 2026-09-09
 
 Coaching feel: honest plan titles, gentler cues, spoken progress, earlier prep.

@@ -129,14 +129,17 @@ class MainActivity : AppCompatActivity() {
         userPrefs      = UserPrefs(this)
         workoutHistory = WorkoutHistory(this)
 
-        // Invalidate half-stride calibrations from older builds (e.g. 0.41 m walk).
+        // Only discard genuinely unusable calibrations. The earlier 0.55 / 0.85 floors were
+        // anatomical stride figures, but the counter registers about two peaks per stride
+        // while walking, so they wiped correct calibrations and no recalibration could
+        // satisfy them — leaving users permanently nagged.
         if (userPrefs.isCalibrated &&
-            (userPrefs.walkStrideM < 0.55 || userPrefs.runStrideM < 0.85)
+            (userPrefs.walkStrideM < 0.25 || userPrefs.runStrideM < 0.35)
         ) {
             userPrefs.isCalibrated = false
             Toast.makeText(
                 this,
-                "Previous step lengths looked too short — please recalibrate (⚙).",
+                "Previous step lengths looked unusable — please recalibrate (⚙).",
                 Toast.LENGTH_LONG
             ).show()
         }

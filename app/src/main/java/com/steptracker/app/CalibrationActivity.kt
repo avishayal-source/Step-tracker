@@ -15,7 +15,6 @@ import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import com.google.android.material.button.MaterialButton
-import kotlin.math.sqrt
 
 /**
  * Live step length calibration wizard.
@@ -51,14 +50,10 @@ class CalibrationActivity : AppCompatActivity(), SensorEventListener {
     private var locationManager: LocationManager? = null
     private lateinit var userPrefs: UserPrefs
 
-    // Stricter than the main tracker: calibration must not double-count peaks.
-    private val GRAVITY_ALPHA = 0.80f
-    private val PEAK_THRESHOLD = 2.4f
-    private val MIN_STEP_MS = 300L   // ≤ 200 SPM — enough for jog, cuts half-period doubles
-    private var gx = 0f; private var gy = 0f; private var gz = 9.81f
-    private var lastMag = 0f
-    private var rising = false
-    private var lastStepWallMs = 0L
+    // Must be the tracker's counter, not a stricter one: we are measuring metres per
+    // step *as the tracker counts steps*, so a different counter here silently scales
+    // every distance the app reports.
+    private val peaks = StepPeakDetector()
 
     private var calibratingJog = false
     private var phase = Phase.SELECT
@@ -172,8 +167,7 @@ class CalibrationActivity : AppCompatActivity(), SensorEventListener {
             }
             Phase.COUNTING -> {
                 stepCount = 0; gpsDistanceM = 0.0; lastLocation = null
-                computedStride = 0.0; lastStepWallMs = 0L
-                lastMag = 0f; rising = false
+                computedStride = 0.0; peaks.reset()
                 val verb = if (calibratingJog) "jog" else "walk"
                 val Verb = if (calibratingJog) "Jog" else "Walk"
                 tvTitle.text = "Calibrate $Verb Step Length"
@@ -210,20 +204,22 @@ class CalibrationActivity : AppCompatActivity(), SensorEventListener {
         if (h < 120f) return ""
         val exp = if (calibratingJog)
             UserPrefs.expectedRunStrideM(h) else UserPrefs.expectedWalkStrideM(h)
+        // Compared against the walking stride, not the measurement: the app registers about
+        // two peaks per stride, so a healthy result lands near half the anatomical figure.
         val ratio = computedStride / exp
         val flag = when {
-            ratio < 0.70 -> "\n\n⚠ This is much shorter than typical for ${h.toInt()} cm " +
-                "(~${"%.2f".format(exp)} m). Steps may have been over-counted — retry outdoors."
+            ratio < 0.35 -> "\n\n⚠ Much shorter than expected for ${h.toInt()} cm " +
+                "(stride ~${"%.2f".format(exp)} m). Retry outdoors on a longer straight path."
             ratio > 1.35 -> "\n\n⚠ This is longer than typical for ${h.toInt()} cm " +
                 "(~${"%.2f".format(exp)} m). Check GPS / try again."
-            else -> "\n\nTypical for ${h.toInt()} cm: ~${"%.2f".format(exp)} m"
+            else -> "\n\nYour stride at ${h.toInt()} cm is ~${"%.2f".format(exp)} m; " +
+                "the app measures metres per detected step, so about half that is normal."
         }
         return flag
     }
 
     private fun startCounting() {
-        stepCount = 0; gpsDistanceM = 0.0; lastLocation = null; lastStepWallMs = 0L
-        lastMag = 0f; rising = false
+        stepCount = 0; gpsDistanceM = 0.0; lastLocation = null; peaks.reset()
         btnStart.visibility = View.GONE
         btnStop.visibility  = View.VISIBLE
         btnStop.isEnabled   = false
@@ -328,29 +324,19 @@ class CalibrationActivity : AppCompatActivity(), SensorEventListener {
 
     private fun acceptResult() {
         if (computedStride <= 0.0) return
-        // Adult ranges — previous floors (0.4 / 0.5) accepted half-stride bugs.
-        val minOk = if (calibratingJog) 0.85 else 0.55
-        val maxOk = if (calibratingJog) 1.80 else 1.05
+        // These bounds only reject nonsense (a lost GPS fix, a pocketed phone). They are
+        // deliberately not anatomical stride ranges: the counter registers about two peaks
+        // per stride when walking, so a correct result is near half a person's stride, and
+        // rejecting that left users unable to calibrate at all.
+        val minOk = if (calibratingJog) 0.35 else 0.25
+        val maxOk = if (calibratingJog) 2.00 else 1.20
         if (computedStride < minOk || computedStride > maxOk) {
             Toast.makeText(this,
-                "Result (${"%.2f".format(computedStride)} m) is outside the normal " +
+                "Result (${"%.2f".format(computedStride)} m) is outside the usable " +
                     "${"%.2f".format(minOk)}–${"%.2f".format(maxOk)} m range. " +
                     "Retry outdoors with a longer straight path.",
                 Toast.LENGTH_LONG).show()
             return
-        }
-        // Extra height cross-check when available
-        val h = userPrefs.heightCm
-        if (h >= 120f) {
-            val exp = if (calibratingJog)
-                UserPrefs.expectedRunStrideM(h) else UserPrefs.expectedWalkStrideM(h)
-            if (computedStride < exp * 0.65) {
-                Toast.makeText(this,
-                    "Too short vs your height (expected ~${"%.2f".format(exp)} m). " +
-                        "Likely over-counted steps — please recalibrate.",
-                    Toast.LENGTH_LONG).show()
-                return
-            }
         }
         if (calibratingJog) userPrefs.runStrideM  = computedStride
         else                userPrefs.walkStrideM = computedStride
@@ -365,26 +351,11 @@ class CalibrationActivity : AppCompatActivity(), SensorEventListener {
 
     override fun onSensorChanged(event: SensorEvent) {
         if (event.sensor.type != Sensor.TYPE_ACCELEROMETER) return
-        val ax = event.values[0]; val ay = event.values[1]; val az = event.values[2]
-        gx = GRAVITY_ALPHA * gx + (1 - GRAVITY_ALPHA) * ax
-        gy = GRAVITY_ALPHA * gy + (1 - GRAVITY_ALPHA) * ay
-        gz = GRAVITY_ALPHA * gz + (1 - GRAVITY_ALPHA) * az
-        val mag = sqrt(((ax-gx)*(ax-gx) + (ay-gy)*(ay-gy) + (az-gz)*(az-gz)).toDouble()).toFloat()
-
-        if (mag > lastMag) {
-            rising = true
-        } else if (rising && lastMag > PEAK_THRESHOLD) {
-            rising = false
-            val nowMs = System.currentTimeMillis()
-            if (nowMs - lastStepWallMs >= MIN_STEP_MS) {
-                lastStepWallMs = nowMs
-                stepCount++
-                runOnUiThread { updateCountingUI() }
-            }
-        } else {
-            rising = false
-        }
-        lastMag = mag
+        peaks.onSample(
+            event.values[0], event.values[1], event.values[2], System.currentTimeMillis()
+        ) ?: return
+        stepCount++
+        runOnUiThread { updateCountingUI() }
     }
 
     private fun updateCountingUI() {

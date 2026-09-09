@@ -36,3 +36,6 @@ build/
 *.jks
 *.keystore
 keystore.properties
+
+# Classifier logs pulled off a device, plus the throwaway scripts used to read them
+device_logs/

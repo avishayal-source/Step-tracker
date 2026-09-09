@@ -4,19 +4,25 @@ import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.util.Log
-import kotlin.math.sqrt
 
 /**
- * Walk/run classifier — v12 (cadence-backed run→walk gate)
+ * Walk/run classifier — v13 (trusted-signal run→walk gate)
  *
  * v11 added an accelerometer impact gait gate so slow uphill running isn't
- * forced to WALKING by GPS dips. Logs from 2026-08-23 still showed long false
- * walking segments at ~186 SPM: impact baselines often aren't ready early in a
- * session, so gaitSaysRunning stayed false and speed alone still flipped run→walk.
+ * forced to WALKING by GPS dips. v12 then let cadence veto a run→walk transition
+ * so a GPS sag couldn't drop a slow jog to walking.
  *
- * v12: a run/jog → walk transition also requires cadence to look like walking.
- * High SPM / run-majority votes keep the running family even when GPS sags and
- * gait baselines aren't learned yet.
+ * The 2026-09-08 log showed that veto is dangerous when cadence lies: peak
+ * detection registered a mid-stride bounce as a second step, so a 1.14 m/s
+ * cooldown walk read as 197 SPM (a 0.35 m step). cadenceSaysRunning was therefore
+ * permanently true and the whole 3-minute cooldown stayed JOGGING.
+ *
+ * v13 keeps the veto but only honours signals that can be trusted:
+ *   • cadence is ignored when GPS says the implied step length is anatomically
+ *     impossible (see cadenceTrustworthy),
+ *   • the impact gait feature outranks cadence whenever its baselines are learned,
+ *   • sustained slow GPS overrides every veto, so the classifier can never be
+ *     pinned in the running family (see SLOW_OVERRIDE_MS).
  *
  * Still uses: GPS Kalman primary signal, hysteresis, impact gait when ready,
  * in-place hold, leaky-bucket dwell, cadence fallback without GPS.
@@ -43,6 +49,10 @@ class StepDetector(private val listener: StepListener) : SensorEventListener {
         val recentImpact: Double,
         val walkImpactBase: Double?,
         val runImpactBase: Double?,
+        val peakMag: Double,
+        val impliedStepM: Double?,
+        val cadenceTrusted: Boolean,
+        val slowStreakMs: Long,
         val decisionReason: String,
         val previousActivity: ActivityType,
         val currentActivity: ActivityType
@@ -65,16 +75,9 @@ class StepDetector(private val listener: StepListener) : SensorEventListener {
         return offsetMs + bootNs / 1_000_000L
     }
 
-    // ── Gravity filter ────────────────────────────────────────────────────────
-    private val GRAVITY_ALPHA = 0.80f
-    private var gx = 0f; private var gy = 0f; private var gz = 9.81f
-
-    // ── Peak / step detection ─────────────────────────────────────────────────
-    private val STEP_THRESHOLD = 1.5f
-    private val MIN_STEP_MS    = 230L
-    private var lastStepWallMs = 0L
-    private var lastMag        = 0f
-    private var rising         = false
+    // ── Peak / step detection (shared with the calibration wizard) ────────────
+    private val peaks       = StepPeakDetector()
+    private var lastPeakMag = 0f
 
     // ── Cadence window (used only for logging + no-GPS fallback) ──────────────
     private val INTERVAL_WINDOW = 5
@@ -155,6 +158,20 @@ class StepDetector(private val listener: StepListener) : SensorEventListener {
     private val STATE_DWELL_MS = 8_000L
     private val DWELL_DECAY    = 1.0   // leaky-bucket: counter-evidence drains at this × dt
 
+    // Shortest step length a person can actually cover. Below this the cadence reading
+    // must be wrong (peaks counted twice), so cadence loses its vote.
+    private val MIN_PLAUSIBLE_STEP_M = 0.50
+    private val STEP_CHECK_MIN_MPS   = 0.7   // too slow to infer anything reliable below this
+
+    // Safety valve: once GPS has said "walking pace" for this long without a break,
+    // walk wins no matter what gait or cadence claim. Nothing can pin us in a run.
+    // The speed bound sits well under RUN_EXIT_MPS so a slow shuffling jog (~1.6 m/s)
+    // can never trip it — this is a last resort, not a normal path to walking.
+    private val SLOW_OVERRIDE_MPS = 1.40
+    private val SLOW_OVERRIDE_MS  = 40_000L
+    private var slowSinceMs  = 0L
+    private var slowStreakMs = 0L
+
     // Leaky-bucket switch evidence. switchAccumMs accumulates time toward the pending
     // switch (stateCandidate) and drains when evidence reverses, so brief GPS wobble
     // across the threshold no longer hard-resets progress (the v9 fragility).
@@ -187,18 +204,55 @@ class StepDetector(private val listener: StepListener) : SensorEventListener {
     private val gaitSaysRunning: Boolean
         get() = gaitSeparationReady && recentImpact >= (walkImpactEwma + runImpactEwma) / 2.0
 
-    /** Cadence still looks like the running family (votes + instantaneous SPM). */
-    private val cadenceSaysRunning: Boolean
-        get() = runVoteCount >= 5 || currentSpm >= CLASSIFY_SPM
+    /**
+     * Landing force sits right on the learned walk baseline. Deliberately stricter than
+     * "below the walk/run midpoint": the run baseline is learned from fast running, so a
+     * slow jog lands well under that midpoint and would otherwise read as walking.
+     */
+    private val GAIT_WALK_RATIO = 1.35
+    private val gaitSaysWalking: Boolean
+        get() = gaitSeparationReady && recentImpact <= walkImpactEwma * GAIT_WALK_RATIO
+
+    /** Step length implied by GPS speed and detected cadence — null when unusable. */
+    val impliedStepM: Double?
+        get() {
+            val speed = filteredGpsSpeed ?: return null
+            val spm = currentSpm
+            if (spm <= 0 || speed < STEP_CHECK_MIN_MPS) return null
+            return speed / (spm / 60.0)
+        }
 
     /**
-     * Allow run/jog → walk only when BOTH speed says walk AND neither gait nor
-     * cadence still insist on running. Prevents GPS-dip false walks while jogging.
+     * Cadence is only believable when GPS agrees the implied step length is possible.
+     * A doubled step count reads as ~200 SPM at walking speed, i.e. a ~0.35 m step,
+     * and must not be allowed to speak for the runner.
+     */
+    val cadenceTrustworthy: Boolean
+        get() {
+            val step = impliedStepM ?: return true
+            return step >= MIN_PLAUSIBLE_STEP_M
+        }
+
+    /** Cadence still looks like the running family (votes + instantaneous SPM). */
+    private val cadenceSaysRunning: Boolean
+        get() = cadenceTrustworthy && (runVoteCount >= 5 || currentSpm >= CLASSIFY_SPM)
+
+    /**
+     * Allow run/jog → walk only on positive evidence of walking, ranked by how much the
+     * signal can be trusted: a long slow stretch first, then landing force, then cadence.
+     *
+     * Untrusted cadence holds the run rather than releasing it. Dropping the veto instead
+     * would re-open the v11 false-walk hole, because the doubled step count also shows up
+     * during a slow jog — replaying 2026-09-08 that way invented two false walk segments
+     * totalling 3 minutes in the middle of the run.
      */
     private fun allowRunToWalk(filtered: Double): Boolean {
         if (filtered >= RUN_EXIT_MPS) return false
-        if (gaitSaysRunning || cadenceSaysRunning) return false
-        return true
+        if (slowStreakMs >= SLOW_OVERRIDE_MS) return true
+        if (gaitSaysRunning) return false
+        if (gaitSaysWalking) return true
+        if (!cadenceTrustworthy) return false
+        return !cadenceSaysRunning
     }
 
     private fun isRunningFamily(a: ActivityType) =
@@ -218,33 +272,15 @@ class StepDetector(private val listener: StepListener) : SensorEventListener {
         if (event.sensor.type != Sensor.TYPE_ACCELEROMETER) return
         val wallMs = bootNsToWallMs(event.timestamp)
 
-        val ax = event.values[0]; val ay = event.values[1]; val az = event.values[2]
-        gx = GRAVITY_ALPHA * gx + (1 - GRAVITY_ALPHA) * ax
-        gy = GRAVITY_ALPHA * gy + (1 - GRAVITY_ALPHA) * ay
-        gz = GRAVITY_ALPHA * gz + (1 - GRAVITY_ALPHA) * az
-
-        val mag = sqrt(((ax-gx)*(ax-gx) + (ay-gy)*(ay-gy) + (az-gz)*(az-gz)).toDouble()).toFloat()
-        detectStep(mag, wallMs)
-        lastMag = mag
+        val step = peaks.onSample(event.values[0], event.values[1], event.values[2], wallMs)
+            ?: return
+        registerStep(step.wallMs, step.intervalMs, step.peakMag)
     }
 
-    // ── Step detection ────────────────────────────────────────────────────────
-
-    private fun detectStep(mag: Float, wallMs: Long) {
-        if (mag > lastMag) {
-            rising = true
-        } else if (rising && lastMag > STEP_THRESHOLD) {
-            rising = false
-            val gap = wallMs - lastStepWallMs
-            // lastMag is the peak of the just-finished upswing = this step's impact.
-            if (gap >= MIN_STEP_MS) registerStep(wallMs, gap, lastMag)
-        } else {
-            rising = false
-        }
-    }
+    // ── Step handling ─────────────────────────────────────────────────────────
 
     private fun registerStep(wallMs: Long, intervalMs: Long, peakMag: Float) {
-        lastStepWallMs = wallMs
+        lastPeakMag = peakMag
         if (stepIntervals.size >= INTERVAL_WINDOW) stepIntervals.removeFirst()
         stepIntervals.addLast(intervalMs)
 
@@ -261,6 +297,16 @@ class StepDetector(private val listener: StepListener) : SensorEventListener {
         val gpsAge       = (wallMs - latestGpsTimeMs).coerceAtLeast(0L)
         val haveFreshGps = kalmanInitialised && gpsAge <= GPS_STALE_MS
         val filtered     = filteredGpsSpeed
+
+        // Track an unbroken stretch of walking-pace GPS. Anything faster, a pause, or a
+        // GPS dropout breaks it, so the override can only fire on real sustained evidence.
+        if (haveFreshGps && filtered != null && filtered in LOW_WALK_MPS..SLOW_OVERRIDE_MPS) {
+            if (slowSinceMs == 0L) slowSinceMs = wallMs
+            slowStreakMs = wallMs - slowSinceMs
+        } else {
+            slowSinceMs = 0L
+            slowStreakMs = 0L
+        }
 
         // Learn the user's walk vs run impact levels from unambiguous GPS speeds.
         if (haveFreshGps && filtered != null && recentImpact > 0.0) {
@@ -341,6 +387,10 @@ class StepDetector(private val listener: StepListener) : SensorEventListener {
                             filtered < RUN_EXIT_MPS && (gaitSaysRunning || cadenceSaysRunning) ->
                             if (gaitSaysRunning) "hold_gait_jog" else "hold_cadence_jog"
                         desired == currentActivity -> "stable"
+                        isRunningFamily(currentActivity) && slowStreakMs >= SLOW_OVERRIDE_MS ->
+                            "dwell_pending_slow_override"
+                        isRunningFamily(currentActivity) && !cadenceTrustworthy ->
+                            "dwell_pending_cadence_distrusted"
                         else -> "dwell_pending"
                     }
                 }
@@ -430,6 +480,10 @@ class StepDetector(private val listener: StepListener) : SensorEventListener {
             recentImpact = recentImpact,
             walkImpactBase = if (walkImpactSeen) walkImpactEwma else null,
             runImpactBase = if (runImpactSeen) runImpactEwma else null,
+            peakMag = lastPeakMag.toDouble(),
+            impliedStepM = impliedStepM,
+            cadenceTrusted = cadenceTrustworthy,
+            slowStreakMs = slowStreakMs,
             decisionReason = decisionReason,
             previousActivity = prevActivity,
             currentActivity = currentActivity
@@ -441,7 +495,8 @@ class StepDetector(private val listener: StepListener) : SensorEventListener {
     fun reset(seedActivity: ActivityType = ActivityType.IDLE) {
         stepIntervals.clear(); classVotes.clear()
         currentActivity = seedActivity
-        lastStepWallMs = 0L; lastMag = 0f; rising = false
+        peaks.reset(); lastPeakMag = 0f
+        slowSinceMs = 0L; slowStreakMs = 0L
         offsetInitialised = false
         stateCandidate = null; switchAccumMs = 0.0
         kalmanInitialised = false; kalmanX = 0.0; kalmanP = 1.0; lastKalmanGain = null
