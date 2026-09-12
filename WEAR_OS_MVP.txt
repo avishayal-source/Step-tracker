@@ -1,0 +1,72 @@
+Y WALK — WEAR OS MVP SPEC
+==========================
+Status: In progress — M1 started on feature/wear-os-workout
+Date: 2026-07-20 (updated 2026-07-30)
+Branch: feature/wear-os-workout (from development)
+
+Product split
+-------------
+WATCH (during workout, phone may stay home)
+  - Today's synced schedule
+  - Start / finish workout
+  - Offline activity tracking
+  - Local storage until phone reconnects
+
+PHONE (before / after)
+  - Botty, plan approval, reminders
+  - History, insights, calibration
+  - Sync schedule → watch; import finished sessions ← watch
+
+Out of scope (MVP)
+------------------
+  - Heart rate
+  - Apple Watch / Garmin / Fitbit SDKs
+  - Botty / goal evaluation on watch
+  - Reminder scheduling on watch (phone notifications may still appear on watch via system)
+  - Full History / insights UI on watch
+  - Low-battery warning UI on watch
+
+
+────────────────────────────────────────
+DECISIONS (from product Q&A)
+────────────────────────────────────────
+1. Free workouts: YES — scheduled OR ad-hoc Start on watch
+2. Schedule sync horizon: TODAY ONLY
+3. Distance: stride-based estimate from phone calibration ONLY in MVP
+   - Watch GPS: OUT of MVP (confirmed 2026-07-20) — candidate for v1.1 / stretch
+4. Classification: SIMPLER on-watch detector (not full phone port)
+5. Watch UI during workout: activity type, steps, timer, distance, current segment + progress, next segment preview
+6. Sync after Finish: automatic when phone is nearby (no extra tap)
+7. Unsynced sessions: keep on watch until sync (no N-day nag in MVP)
+8. Git branch: feature/wear-os-workout off development
+9. If phone present mid-workout: prefer phone GPS for distance when available (hybrid)
+10. Watch launcher name: "Y Walk"
+
+
+────────────────────────────────────────
+MILESTONES (IMPLEMENTATION ORDER)
+────────────────────────────────────────
+M1. Empty Wear app installs; opens “Y Walk”; talks to phone (hello sync)  ← IN PROGRESS
+M2. Sync today schedule + strides phone → watch; Home screen
+M3. Free + scheduled Start/Finish; offline storage; simple classifier; UI fields
+M4. Auto sync session → phone History
+M5. Play Wear packaging + privacy blurb + emulator test checklist
+M6. (Post-MVP / stretch) Watch GPS mode — not started with MVP
+
+
+────────────────────────────────────────
+M1 NOTES (2026-07-30)
+────────────────────────────────────────
+  - Module: :wear (applicationId com.steptracker.app.wear)
+  - Phone embeds wear via wearApp project(':wear')
+  - Data Layer paths: /ywalk/hello , /ywalk/ping
+  - Capabilities: ywalk_phone / ywalk_watch
+  - Watch UI: Compose Material — title, link status, Ping phone button
+
+
+────────────────────────────────────────
+TESTING WITHOUT A PHYSICAL WATCH
+────────────────────────────────────────
+  - Android Studio Wear OS emulator paired with phone emulator/device
+  - Validate flows M1–M4
+  - Before open Wear beta: one real Wear OS watch for battery + step quality

@@ -41,6 +41,7 @@
     <string name="botty_change_goal">Change goal</string>
     <string name="botty_go_schedule">Open today in Schedule</string>
     <string name="audio_settings_title">Sounds &amp; voice</string>
+    <string name="help_menu_title">Quick help</string>
     <string name="audio_settings_sound">Whistle cue on walk/run changes</string>
     <string name="audio_settings_voice">Spoken progress during a workout</string>
     <string name="audio_settings_test">Test whistle</string>

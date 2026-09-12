@@ -34,6 +34,11 @@ class UserPrefs(context: Context) {
         get() = prefs.getBoolean("voice_cues", true)
         set(v) { prefs.edit().putBoolean("voice_cues", v).apply() }
 
+    /** First-run product tour (after legal consent). */
+    var hasSeenProductHelp: Boolean
+        get() = prefs.getBoolean("seen_product_help", false)
+        set(v) { prefs.edit().putBoolean("seen_product_help", v).apply() }
+
     companion object {
         /** Typical walk stride ≈ 41.5% of height. */
         fun expectedWalkStrideM(heightCm: Float): Double =

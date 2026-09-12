@@ -29,6 +29,8 @@ class MainActivity : AppCompatActivity() {
         const val EXTRA_OPEN_COACH = "extra_open_coach"
     }
 
+    private var wearSync: com.steptracker.app.wear.WearSyncManager? = null
+
     private var service: StepTrackerService? = null
     private var isBound = false
     private val connection = object : ServiceConnection {
@@ -64,6 +66,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var tvJogStats: TextView
     private lateinit var tvRunStats: TextView
     private lateinit var btnStartStop: MaterialButton
+    private lateinit var btnStopSession: MaterialButton
     private lateinit var btnReset: MaterialButton
     private lateinit var btnCalibrate: MaterialButton
     private lateinit var layoutTimeline: LinearLayout
@@ -162,6 +165,7 @@ class MainActivity : AppCompatActivity() {
         tvJogStats        = findViewById(R.id.tvJogStats)
         tvRunStats        = findViewById(R.id.tvRunStats)
         btnStartStop      = findViewById(R.id.btnStartStop)
+        btnStopSession    = findViewById(R.id.btnStopSession)
         btnReset          = findViewById(R.id.btnReset)
         btnCalibrate      = findViewById(R.id.btnCalibrate)
         layoutTimeline    = findViewById(R.id.layoutTimeline)
@@ -178,6 +182,7 @@ class MainActivity : AppCompatActivity() {
         rvHistory.layoutManager = androidx.recyclerview.widget.LinearLayoutManager(this)
 
         btnStartStop.setOnClickListener { toggleTracking() }
+        btnStopSession.setOnClickListener { stopTrackingSession() }
         btnReset.setOnClickListener     { confirmReset() }
         btnCalibrate.setOnClickListener { startActivity(Intent(this, CalibrationActivity::class.java)) }
 
@@ -192,6 +197,10 @@ class MainActivity : AppCompatActivity() {
         coachView.onOpenWorkout = { workoutId ->
             tabLayout.getTabAt(1)?.select()
             tabLayout.post { scheduleView.loadPlannedWorkout(workoutId) }
+        }
+
+        if (!userPrefs.hasSeenProductHelp) {
+            startActivity(HelpActivity.intent(this))
         }
 
         // Existing plans were scheduled with per-workout alarms; make sure the daily
@@ -226,6 +235,17 @@ class MainActivity : AppCompatActivity() {
             Toast.makeText(this, "Tip: tap ⚙ Calibrate to set your personal step length", Toast.LENGTH_LONG).show()
 
         handleIntentExtras(intent)
+
+        wearSync = com.steptracker.app.wear.WearSyncManager(this) { _ ->
+            runOnUiThread {
+                Toast.makeText(this, "⌚ Watch ping received", Toast.LENGTH_SHORT).show()
+            }
+        }.also { it.start() }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        wearSync?.sendHelloToWatches()
     }
 
     private fun showMoreMenu(anchor: View) {
@@ -241,6 +261,9 @@ class MainActivity : AppCompatActivity() {
                 }
                 R.id.action_audio_settings -> {
                     showAudioSettings(); true
+                }
+                R.id.action_quick_help -> {
+                    startActivity(HelpActivity.intent(this)); true
                 }
                 R.id.action_privacy -> {
                     startActivity(LegalDocActivity.privacy(this)); true
@@ -299,6 +322,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
+        wearSync?.stop()
+        wearSync = null
         stopwatchHandler.removeCallbacks(stopwatchRunnable)
         if (::scheduleView.isInitialized) scheduleView.onActivityDestroy()
         if (isBound) { service?.onUpdateListener = null; unbindService(connection) }
@@ -340,12 +365,28 @@ class MainActivity : AppCompatActivity() {
 
     private fun toggleTracking() {
         val svc = service ?: return
-        if (svc.isTracking) {
-            svc.stopTracking()
-            stopwatchHandler.removeCallbacks(stopwatchRunnable)
-            updateTrackingUI()
-        } else if (hasTrackingPerms()) startTrackingService()
-        else requestTrackingPermissions()
+        when {
+            svc.isTracking && svc.isPaused -> {
+                svc.resumeTracking()
+                stopwatchHandler.removeCallbacks(stopwatchRunnable)
+                stopwatchHandler.post(stopwatchRunnable)
+                updateTrackingUI()
+            }
+            svc.isTracking -> {
+                svc.pauseTracking()
+                updateTrackingUI()
+            }
+            hasTrackingPerms() -> startTrackingService()
+            else -> requestTrackingPermissions()
+        }
+    }
+
+    private fun stopTrackingSession() {
+        val svc = service ?: return
+        if (!svc.isTracking) return
+        svc.stopTracking()
+        stopwatchHandler.removeCallbacks(stopwatchRunnable)
+        updateTrackingUI()
     }
 
     /** Explain why each permission is needed before the system dialog (Play policy). */
@@ -436,6 +477,7 @@ class MainActivity : AppCompatActivity() {
         val activityType = svc.currentPeriod?.type
         tvCurrentActivity.text = when {
             !svc.isTracking -> "Not tracking"
+            svc.isPaused -> "⏸ Paused"
             activityType == ActivityType.RUNNING -> "🏃 Running"
             activityType == ActivityType.JOGGING -> "🏃 Jogging"
             activityType == ActivityType.WALKING -> "🚶 Walking"
@@ -443,6 +485,7 @@ class MainActivity : AppCompatActivity() {
         }
         val pillColor = when {
             !svc.isTracking -> ContextCompat.getColor(this, R.color.surface_elevated)
+            svc.isPaused -> ContextCompat.getColor(this, R.color.surface_elevated)
             activityType == ActivityType.RUNNING -> 0xBFFF5722.toInt()   // coral-orange
             activityType == ActivityType.JOGGING -> 0xBFFFA000.toInt()   // amber (mid tier)
             activityType == ActivityType.WALKING -> 0xBF14B86A.toInt()   // emerald
@@ -481,8 +524,23 @@ class MainActivity : AppCompatActivity() {
         tvRunStats.text  = "🏃 Run\n${svc.runSteps} steps\n${svc.formatDist(svc.runDistM)}"
 
         // ── Buttons ───────────────────────────────────────────────────────────
-        btnStartStop.text = if (svc.isTracking) "■  Stop" else "▶  Start"
-        btnReset.visibility = if (!svc.isTracking && svc.totalSteps > 0) View.VISIBLE else View.GONE
+        when {
+            !svc.isTracking -> {
+                btnStartStop.text = "▶  Start"
+                btnStopSession.visibility = View.GONE
+                btnReset.visibility = if (svc.totalSteps > 0) View.VISIBLE else View.GONE
+            }
+            svc.isPaused -> {
+                btnStartStop.text = "▶  Resume"
+                btnStopSession.visibility = View.VISIBLE
+                btnReset.visibility = View.GONE
+            }
+            else -> {
+                btnStartStop.text = "⏸  Pause"
+                btnStopSession.visibility = View.VISIBLE
+                btnReset.visibility = View.GONE
+            }
+        }
 
         // ── Session timeline ──────────────────────────────────────────────────
         val periods = svc.activityPeriods.filter { it.type != ActivityType.IDLE }

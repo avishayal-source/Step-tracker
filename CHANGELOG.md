@@ -3,6 +3,15 @@
 All notable changes to Y Walk are documented here. Versions follow the app's
 `versionName` (and `versionCode` in parentheses).
 
+## 1.0.13 (14) — 2026-09-12
+
+Pause/Stop, Quick help, Wear M1 on the commercial branch.
+
+- Schedule: Pause freezes the period timer; Stop aborts but keeps the entered periods
+- Tracking: Pause freezes sensors/stopwatch; Stop ends the session
+- First-run Quick help tour (Tracking / Schedule / Botty / done); reopen from ⋮
+- Wear OS module ported: applicationId `com.ywalk.app.wear`, hello/ping Data Layer (M1)
+
 ## 1.0.12 (13) — 2026-09-12
 
 Botty beginner plans: realistic Couch-to-5K / 10K ladders instead of 10%-rule sprawl.

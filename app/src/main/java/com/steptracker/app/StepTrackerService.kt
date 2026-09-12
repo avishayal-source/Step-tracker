@@ -26,6 +26,8 @@ class StepTrackerService : Service(), StepDetector.StepListener {
         const val NOTIFICATION_ID      = 1
         const val ACTION_START         = "START"
         const val ACTION_STOP          = "STOP"
+        const val ACTION_PAUSE         = "PAUSE"
+        const val ACTION_RESUME        = "RESUME"
         const val EXTRA_INITIAL_TYPE   = "initial_type"
     }
 
@@ -94,6 +96,9 @@ class StepTrackerService : Service(), StepDetector.StepListener {
 
     // ── Tracking state ────────────────────────────────────────────────────────
     var isTracking = false;   private set
+    var isPaused = false;     private set
+    private var accumulatedElapsedMs = 0L
+    private var segmentStartMs = 0L
     var totalSteps = 0;       private set
     val activityPeriods       = mutableListOf<ActivityPeriod>()
     var currentPeriod: ActivityPeriod? = null; private set
@@ -140,7 +145,9 @@ class StepTrackerService : Service(), StepDetector.StepListener {
                 }
                 startTracking(initial ?: ActivityType.WALKING)
             }
-            ACTION_STOP  -> stopTracking()
+            ACTION_PAUSE  -> pauseTracking()
+            ACTION_RESUME -> resumeTracking()
+            ACTION_STOP   -> stopTracking()
         }
         return START_NOT_STICKY
     }
@@ -157,8 +164,11 @@ class StepTrackerService : Service(), StepDetector.StepListener {
     fun startTracking(initialType: ActivityType = ActivityType.WALKING) {
         if (isTracking) return
         isTracking     = true
+        isPaused       = false
         historySaved   = false
+        accumulatedElapsedMs = 0L
         sessionStartMs = System.currentTimeMillis()
+        segmentStartMs = sessionStartMs
         val seed = if (initialType == ActivityType.IDLE) ActivityType.WALKING else initialType
         stepDetector.reset(seed)
         openClassifierDebugLog()
@@ -169,6 +179,72 @@ class StepTrackerService : Service(), StepDetector.StepListener {
         if (!wakeLock.isHeld) wakeLock.acquire(4 * 60 * 60 * 1000L)
         openNewPeriod(seed, System.currentTimeMillis())
         startInForeground(buildNotification("Tracking…"))
+    }
+
+    /** Freeze sensors/GPS; keep session totals for Resume. */
+    fun pauseTracking() {
+        if (!isTracking || isPaused) return
+        accumulatedElapsedMs += System.currentTimeMillis() - segmentStartMs
+        isPaused = true
+        sensorManager.unregisterListener(stepDetector)
+        stopGps()
+        updateNotification("Paused – $totalSteps steps")
+        onUpdateListener?.invoke()
+    }
+
+    fun resumeTracking() {
+        if (!isTracking || !isPaused) return
+        isPaused = false
+        segmentStartMs = System.currentTimeMillis()
+        sensorManager.registerListener(stepDetector,
+            sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER),
+            SensorManager.SENSOR_DELAY_GAME)
+        startGps()
+        if (!wakeLock.isHeld) wakeLock.acquire(4 * 60 * 60 * 1000L)
+        updateNotification("Tracking…")
+        onUpdateListener?.invoke()
+    }
+
+    fun sessionElapsedMs(): Long = when {
+        !isTracking -> accumulatedElapsedMs
+        isPaused -> accumulatedElapsedMs
+        else -> accumulatedElapsedMs + (System.currentTimeMillis() - segmentStartMs)
+    }
+
+    fun stopTracking() {
+        if (!isTracking) return
+        if (!isPaused) {
+            accumulatedElapsedMs += System.currentTimeMillis() - segmentStartMs
+        }
+        isTracking = false
+        isPaused = false
+        sensorManager.unregisterListener(stepDetector)
+        stopGps()
+        if (wakeLock.isHeld) wakeLock.release()
+        val now = System.currentTimeMillis()
+        currentPeriod?.let {
+            it.endTime = now
+            if (it.endTime <= it.startTime) it.endTime = it.startTime + 1000
+        }
+        currentPeriod = null
+        recomputeTotals()
+        if (totalSteps > 0 && !historySaved) {
+            historySaved = true
+            saveWorkoutToHistory()
+        }
+        updateNotification("Stopped – $totalSteps steps · ${formatDist(walkDistM + jogDistM + runDistM)}")
+        onUpdateListener?.invoke()
+        closeClassifierDebugLog()
+        stopForeground(STOP_FOREGROUND_DETACH)
+    }
+
+    fun resetData() {
+        if (isTracking) return
+        totalSteps = 0; walkSteps = 0; runSteps = 0; jogSteps = 0
+        walkDistM = 0.0; runDistM = 0.0; jogDistM = 0.0; historySaved = false
+        accumulatedElapsedMs = 0L; segmentStartMs = 0L
+        activityPeriods.clear(); currentPeriod = null; lastGpsLocation = null
+        onUpdateListener?.invoke()
     }
 
     /**
@@ -201,41 +277,6 @@ class StepTrackerService : Service(), StepDetector.StepListener {
         } catch (e: Exception) {
             try { startForeground(NOTIFICATION_ID, notification) } catch (_: Exception) {}
         }
-    }
-
-    fun sessionElapsedMs(): Long =
-        if (isTracking) System.currentTimeMillis() - sessionStartMs else 0L
-
-    fun stopTracking() {
-        if (!isTracking) return   // FIX #3: idempotent stop
-        isTracking = false
-        sensorManager.unregisterListener(stepDetector)
-        stopGps()
-        if (wakeLock.isHeld) wakeLock.release()
-        val now = System.currentTimeMillis()
-        currentPeriod?.let {
-            it.endTime = now
-            if (it.endTime <= it.startTime) it.endTime = it.startTime + 1000
-        }
-        currentPeriod = null
-        recomputeTotals()
-        // FIX #5: save only once, guarded by historySaved flag
-        if (totalSteps > 0 && !historySaved) {
-            historySaved = true
-            saveWorkoutToHistory()
-        }
-        updateNotification("Stopped – $totalSteps steps · ${formatDist(walkDistM + jogDistM + runDistM)}")
-        onUpdateListener?.invoke()
-        closeClassifierDebugLog()
-        stopForeground(STOP_FOREGROUND_DETACH)
-    }
-
-    fun resetData() {
-        if (isTracking) return
-        totalSteps = 0; walkSteps = 0; runSteps = 0; jogSteps = 0
-        walkDistM = 0.0; runDistM = 0.0; jogDistM = 0.0; historySaved = false
-        activityPeriods.clear(); currentPeriod = null; lastGpsLocation = null
-        onUpdateListener?.invoke()
     }
 
     // ── History ───────────────────────────────────────────────────────────────

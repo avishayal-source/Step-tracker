@@ -1,9 +1,7 @@
 package com.steptracker.app
 
 import android.content.Context
-import android.media.*
 import android.os.CountDownTimer
-import kotlin.math.*
 
 class ScheduleManager(
     private val context: Context,
@@ -28,10 +26,17 @@ class ScheduleManager(
     private var prepTimer: CountDownTimer? = null
     var isRunning = false
         private set
+    var isPaused = false
+        private set
+    /** Remaining time in the active period while paused (or last tick while running). */
+    var pausedRemainingMs = 0L
+        private set
 
     /** Begin 3-2-1 countdown, then run the schedule. */
     fun startWithPrep(schedule: List<ScheduleItem>) {
         prepTimer?.cancel()
+        isPaused = false
+        pausedRemainingMs = 0L
         prepTimer = object : CountDownTimer(3000L, 1000L) {
             override fun onTick(remaining: Long) {
                 val secs = ((remaining + 999) / 1000).toInt().coerceIn(1, 3)
@@ -50,6 +55,7 @@ class ScheduleManager(
             actualStartTime = 0L, actualEndTime = 0L) }.toMutableList()
         currentIndex = 0
         isRunning = true
+        isPaused = false
         startPeriod(0, items[0].durationMs)
     }
 
@@ -63,6 +69,17 @@ class ScheduleManager(
             return
         }
 
+        if (snapshot.paused && snapshot.remainingMs > 0L) {
+            currentIndex = snapshot.currentIndex.coerceIn(0, items.lastIndex)
+            isPaused = true
+            pausedRemainingMs = snapshot.remainingMs
+            // Keep ACTIVE; UI shows frozen countdown until Resume.
+            items[currentIndex] = items[currentIndex].copy(state = ScheduleState.ACTIVE)
+            listener.onTick(currentIndex, pausedRemainingMs)
+            return
+        }
+
+        isPaused = false
         var index = snapshot.currentIndex.coerceIn(0, items.lastIndex)
         var elapsedInPeriod = System.currentTimeMillis() - snapshot.periodStartMs
 
@@ -84,9 +101,32 @@ class ScheduleManager(
         listener.onScheduleComplete()
     }
 
+    /** Freeze the current period timer without aborting the session. */
+    fun pause(): Boolean {
+        if (!isRunning || isPaused) return false
+        prepTimer?.cancel(); prepTimer = null
+        timer?.cancel(); timer = null
+        isPaused = true
+        // pausedRemainingMs already set from the last onTick
+        return true
+    }
+
+    /** Continue from the frozen remaining time. */
+    fun resumeFromPause(): Boolean {
+        if (!isRunning || !isPaused) return false
+        isPaused = false
+        val remaining = pausedRemainingMs.coerceAtLeast(500L)
+        startPeriod(currentIndex, remaining, restartClock = false)
+        return true
+    }
+
+    /** Abort the run. Editor list is owned by the view — not cleared here. */
     fun stop() {
         prepTimer?.cancel(); prepTimer = null
-        timer?.cancel(); timer = null; isRunning = false
+        timer?.cancel(); timer = null
+        isRunning = false
+        isPaused = false
+        pausedRemainingMs = 0L
         if (currentIndex < items.size)
             items[currentIndex] = items[currentIndex].copy(state = ScheduleState.PENDING)
     }
@@ -96,12 +136,15 @@ class ScheduleManager(
     fun editPeriodDuration(index: Int, newMinutes: Int) {
         if (index < 0 || index >= items.size) return
         items[index] = items[index].copy(durationMinutes = newMinutes)
-        if (index == currentIndex && isRunning) {
+        if (index == currentIndex && isRunning && !isPaused) {
             val elapsed = items[index].actualStartTime.let {
                 if (it > 0) System.currentTimeMillis() - it else 0L }
             val remaining = (newMinutes * 60_000L - elapsed).coerceAtLeast(5000L)
             timer?.cancel()
             startPeriod(currentIndex, remaining)
+        } else if (index == currentIndex && isPaused) {
+            pausedRemainingMs = (newMinutes * 60_000L).coerceAtLeast(5000L)
+            listener.onTick(currentIndex, pausedRemainingMs)
         }
         listener.onScheduleEdited()
     }
@@ -117,28 +160,35 @@ class ScheduleManager(
         listener.onScheduleEdited()
     }
 
-    private fun startPeriod(index: Int, durationMs: Long) {
+    private fun startPeriod(index: Int, durationMs: Long, restartClock: Boolean = true) {
         if (index >= items.size) {
             isRunning = false
+            isPaused = false
             playSound(SoundType.COMPLETE)
             listener.onScheduleComplete()
             return
         }
         currentIndex = index
-        items[index] = items[index].copy(state = ScheduleState.ACTIVE,
-            actualStartTime = System.currentTimeMillis())
+        val startMs = if (restartClock || items[index].actualStartTime == 0L)
+            System.currentTimeMillis()
+        else
+            items[index].actualStartTime
+        items[index] = items[index].copy(state = ScheduleState.ACTIVE, actualStartTime = startMs)
         for (i in 0 until index)
             if (items[i].state != ScheduleState.DONE)
                 items[i] = items[i].copy(state = ScheduleState.DONE)
 
         timer?.cancel()
+        pausedRemainingMs = durationMs
         val nextType = if (index + 1 < items.size) items[index + 1].type else null
 
         timer = object : CountDownTimer(durationMs, 250) {
             override fun onTick(remaining: Long) {
+                pausedRemainingMs = remaining
                 listener.onTick(index, remaining)
             }
             override fun onFinish() {
+                pausedRemainingMs = 0L
                 items[index] = items[index].copy(state = ScheduleState.DONE,
                     actualEndTime = System.currentTimeMillis())
                 when (nextType) {

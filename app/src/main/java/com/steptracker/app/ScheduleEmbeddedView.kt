@@ -31,6 +31,7 @@ class ScheduleEmbeddedView(
     private lateinit var btnAddWalk: MaterialButton
     private lateinit var btnAddJog: MaterialButton
     private lateinit var btnStartStop: MaterialButton
+    private lateinit var btnAbort: MaterialButton
     private lateinit var btnSave: MaterialButton
     private lateinit var btnLoad: MaterialButton
     private lateinit var tvCurrentPeriod: TextView
@@ -79,6 +80,7 @@ class ScheduleEmbeddedView(
         btnAddWalk      = root.findViewById(R.id.schedBtnAddWalk)
         btnAddJog       = root.findViewById(R.id.schedBtnAddJog)
         btnStartStop    = root.findViewById(R.id.schedBtnStartStop)
+        btnAbort        = root.findViewById(R.id.schedBtnAbort)
         btnSave         = root.findViewById(R.id.schedBtnSave)
         btnLoad         = root.findViewById(R.id.schedBtnLoad)
         tvCurrentPeriod = root.findViewById(R.id.schedTvCurrentPeriod)
@@ -133,9 +135,11 @@ class ScheduleEmbeddedView(
 
         btnAddWalk.setOnClickListener   { showMinutePicker(ActivityType.WALKING) }
         btnAddJog.setOnClickListener    { showMinutePicker(ActivityType.RUNNING) }
-        btnStartStop.setOnClickListener { toggleSchedule() }
+        btnStartStop.setOnClickListener { onPrimaryScheduleClick() }
+        btnAbort.setOnClickListener     { abortSchedule() }
         btnSave.setOnClickListener      { saveSchedule() }
         btnLoad.setOnClickListener      { loadSchedule() }
+        btnAbort.visibility = View.GONE
 
         activity.bindService(Intent(activity, StepTrackerService::class.java), serviceConn, Context.BIND_AUTO_CREATE)
         layoutRunning.visibility = View.GONE
@@ -230,12 +234,20 @@ class ScheduleEmbeddedView(
     }
 
     private fun persistRunState() {
-        if (!isRunning || schedule.isEmpty()) return
-        val items = scheduleManager.getItems()
-        syncScheduleFromManager(items)
-        val idx = scheduleManager.currentIndex
+        if ((!isRunning && !inPrepCountdown) || schedule.isEmpty()) return
+        val items = if (isRunning) scheduleManager.getItems() else schedule
+        if (isRunning) syncScheduleFromManager(items)
+        val idx = if (isRunning) scheduleManager.currentIndex else 0
         val startMs = items.getOrNull(idx)?.actualStartTime ?: System.currentTimeMillis()
-        runPersistence.save(ScheduleRunPersistence.Snapshot(items, idx, startMs))
+        runPersistence.save(
+            ScheduleRunPersistence.Snapshot(
+                items = items,
+                currentIndex = idx,
+                periodStartMs = startMs,
+                paused = scheduleManager.isPaused,
+                remainingMs = scheduleManager.pausedRemainingMs
+            )
+        )
     }
 
     private fun syncScheduleFromManager(managerItems: List<ScheduleItem>) {
@@ -253,15 +265,45 @@ class ScheduleEmbeddedView(
         isRunning = true
         inPrepCountdown = false
         layoutRunning.visibility = View.VISIBLE
-        btnStartStop.text = "■  Stop"
         btnSave.isEnabled = false
         btnLoad.isEnabled = false
         scheduleAdapter.setRunningMode(true)
-        if (stepService?.isTracking != true) {
+        if (stepService?.isTracking != true && !snap.paused) {
             startStepTracking(schedule.firstOrNull()?.type ?: ActivityType.WALKING)
         }
         scheduleManager.resume(snap)
+        refreshScheduleControls()
         refreshTotals()
+        if (snap.paused) {
+            tvCurrentPeriod.text = "Paused"
+            val rem = snap.remainingMs
+            tvCountdown.text = String.format(
+                "%d:%02d",
+                TimeUnit.MILLISECONDS.toMinutes(rem),
+                TimeUnit.MILLISECONDS.toSeconds(rem) % 60
+            )
+        }
+    }
+
+    private fun refreshScheduleControls() {
+        when {
+            inPrepCountdown -> {
+                btnStartStop.text = "⏸  Pause"
+                btnAbort.visibility = View.VISIBLE
+            }
+            isRunning && scheduleManager.isPaused -> {
+                btnStartStop.text = "▶  Resume"
+                btnAbort.visibility = View.VISIBLE
+            }
+            isRunning -> {
+                btnStartStop.text = "⏸  Pause"
+                btnAbort.visibility = View.VISIBLE
+            }
+            else -> {
+                btnStartStop.text = "▶  Start"
+                btnAbort.visibility = View.GONE
+            }
+        }
     }
 
     private fun saveSchedule() {
@@ -305,27 +347,80 @@ class ScheduleEmbeddedView(
             }.setNegativeButton("Cancel", null).show()
     }
 
-    private fun toggleSchedule() {
-        if (isRunning || inPrepCountdown) {
-            scheduleManager.stop()
-            stopStepTracking()
-            isRunning = false
-            inPrepCountdown = false
-            clearRunState()
-            layoutRunning.visibility = View.GONE
-            btnStartStop.text = "▶  Start"
-            btnSave.isEnabled = true; btnLoad.isEnabled = true
-            scheduleAdapter.setRunningMode(false); scheduleAdapter.notifyDataSetChanged()
-        } else {
-            if (schedule.isEmpty()) { Toast.makeText(activity,"Add at least one period first",Toast.LENGTH_SHORT).show(); return }
-            spokenMarkers.clear()
-            inPrepCountdown = true
-            layoutRunning.visibility = View.VISIBLE
-            btnStartStop.text = "■  Stop"
-            btnSave.isEnabled = false; btnLoad.isEnabled = false
-            tvCurrentPeriod.text = "Get ready…"
-            scheduleManager.startWithPrep(schedule.map { it.copy() })
+    private fun onPrimaryScheduleClick() {
+        when {
+            inPrepCountdown -> abortSchedule()
+            isRunning && scheduleManager.isPaused -> resumeSchedule()
+            isRunning -> pauseSchedule()
+            else -> startSchedule()
         }
+    }
+
+    private fun startSchedule() {
+        if (schedule.isEmpty()) {
+            Toast.makeText(activity, "Add at least one period first", Toast.LENGTH_SHORT).show()
+            return
+        }
+        spokenMarkers.clear()
+        inPrepCountdown = true
+        layoutRunning.visibility = View.VISIBLE
+        btnSave.isEnabled = false
+        btnLoad.isEnabled = false
+        tvCurrentPeriod.text = "Get ready…"
+        refreshScheduleControls()
+        scheduleManager.startWithPrep(schedule.map { it.copy() })
+    }
+
+    private fun pauseSchedule() {
+        if (!scheduleManager.pause()) return
+        pauseStepTracking()
+        persistRunState()
+        tvCurrentPeriod.text = "Paused"
+        refreshScheduleControls()
+        Toast.makeText(activity, "Paused — schedule kept", Toast.LENGTH_SHORT).show()
+    }
+
+    private fun resumeSchedule() {
+        if (!scheduleManager.resumeFromPause()) return
+        val type = scheduleManager.getItems().getOrNull(scheduleManager.currentIndex)?.type
+            ?: ActivityType.WALKING
+        resumeStepTracking(type)
+        persistRunState()
+        refreshScheduleControls()
+    }
+
+    /** Abort ends the run but keeps the period list in the editor. */
+    private fun abortSchedule() {
+        scheduleManager.stop()
+        stopStepTracking()
+        isRunning = false
+        inPrepCountdown = false
+        clearRunState()
+        layoutRunning.visibility = View.GONE
+        btnSave.isEnabled = true
+        btnLoad.isEnabled = true
+        scheduleAdapter.setRunningMode(false)
+        for (i in schedule.indices) {
+            schedule[i] = schedule[i].copy(
+                state = ScheduleState.PENDING,
+                actualStartTime = 0L,
+                actualEndTime = 0L
+            )
+        }
+        scheduleAdapter.notifyDataSetChanged()
+        refreshScheduleControls()
+        refreshTotals()
+        Toast.makeText(activity, "Stopped — your schedule is still here", Toast.LENGTH_SHORT).show()
+    }
+
+    private fun pauseStepTracking() {
+        stepService?.pauseTracking()
+    }
+
+    private fun resumeStepTracking(type: ActivityType) {
+        val svc = stepService ?: return
+        if (svc.isPaused) svc.resumeTracking()
+        else if (!svc.isTracking) startStepTracking(type)
     }
 
     override fun onPrepCountdown(secondsLeft: Int) {
@@ -342,6 +437,7 @@ class ScheduleEmbeddedView(
             scheduleAdapter.setRunningMode(true)
             startStepTracking(schedule.first().type)
             syncScheduleFromManager(scheduleManager.getItems())
+            refreshScheduleControls()
         }
     }
 
@@ -406,12 +502,12 @@ class ScheduleEmbeddedView(
             inPrepCountdown = false
             clearRunState()
             layoutRunning.visibility = View.GONE
-            btnStartStop.text = "▶  Start"
             btnSave.isEnabled = true; btnLoad.isEnabled = true
             scheduleAdapter.setRunningMode(false); scheduleAdapter.setActiveIndex(-1)
             scheduleAdapter.notifyDataSetChanged()
             stopStepTracking()
             spokenMarkers.clear()
+            refreshScheduleControls()
 
             val finished = loadedPlanWorkoutId?.let { id ->
                 val w = planStore.load()?.findWorkout(id)

@@ -1,0 +1,3 @@
+• Pause and Stop on Schedule and Tracking (Stop keeps your schedule)
+• Short Quick help tour for new users (also under ⋮)
+• Wear OS M1: phone↔watch hello/ping (com.ywalk.app.wear)

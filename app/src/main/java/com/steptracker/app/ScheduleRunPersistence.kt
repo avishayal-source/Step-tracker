@@ -14,7 +14,9 @@ class ScheduleRunPersistence(context: Context) {
     data class Snapshot(
         val items: List<ScheduleItem>,
         val currentIndex: Int,
-        val periodStartMs: Long
+        val periodStartMs: Long,
+        val paused: Boolean = false,
+        val remainingMs: Long = 0L
     )
 
     fun save(snapshot: Snapshot) {
@@ -33,6 +35,8 @@ class ScheduleRunPersistence(context: Context) {
             .putInt("index", snapshot.currentIndex)
             .putLong("period_start", snapshot.periodStartMs)
             .putBoolean("running", true)
+            .putBoolean("paused", snapshot.paused)
+            .putLong("remaining_ms", snapshot.remainingMs)
             .apply()
     }
 
@@ -53,7 +57,9 @@ class ScheduleRunPersistence(context: Context) {
             Snapshot(
                 items = items,
                 currentIndex = prefs.getInt("index", 0),
-                periodStartMs = prefs.getLong("period_start", 0L)
+                periodStartMs = prefs.getLong("period_start", 0L),
+                paused = prefs.getBoolean("paused", false),
+                remainingMs = prefs.getLong("remaining_ms", 0L)
             )
         } catch (_: Exception) {
             clear()

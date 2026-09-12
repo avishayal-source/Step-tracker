@@ -12,6 +12,9 @@
         <item
             android:id="@+id/action_audio_settings"
             android:title="@string/audio_settings_title" />
+        <item
+            android:id="@+id/action_quick_help"
+            android:title="@string/help_menu_title" />
     </group>
     <group android:id="@+id/group_legal">
         <item
