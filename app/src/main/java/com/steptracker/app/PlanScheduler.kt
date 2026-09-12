@@ -52,8 +52,8 @@ object PlanScheduler {
 
                 val items = ArrayList<ScheduleItem>()
                 if (warmupMin > 0) items.add(ScheduleItem(ActivityType.WALKING, warmupMin))
-                if (beginner && distanceKm < 3.0) {
-                    // Run/walk intervals: run 2 min, walk 1 min, repeated to fill the session.
+                if (beginner && distanceKm < 4.0) {
+                    // Run/walk intervals for early/mid beginner distance (Couch-to-5K style).
                     val reps = max(4, (mainMin / 3.0).roundToInt())
                     repeat(reps) {
                         items.add(ScheduleItem(ActivityType.RUNNING, 2))

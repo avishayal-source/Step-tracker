@@ -3,6 +3,18 @@
 All notable changes to Y Walk are documented here. Versions follow the app's
 `versionName` (and `versionCode` in parentheses).
 
+## 1.0.12 (13) — 2026-09-12
+
+Botty beginner plans: realistic Couch-to-5K / 10K ladders instead of 10%-rule sprawl.
+
+- True beginners (longest run under 1 km) aiming for ≤ 5 km get a fixed walk/run
+  ladder: 9 weeks normally, 12 weeks if BMI ≥ 30 or age ≥ 65
+- Beginners aiming for ≤ 10 km get a 16-week ladder (20 if high-risk)
+- Asking for more weeks no longer inflates these ladders; asking for fewer still
+  gets the safe fixed length with clearer copy
+- Intermediate / advanced keep the classic ~10% ramp; Botty remains on-device rules
+  (not a cloud LLM)
+
 ## 1.0.11 (12) — 2026-09-09
 
 Classifier v13: a walk after a run is recognised as a walk.
