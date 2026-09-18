@@ -1,6 +1,6 @@
 Y WALK — WEAR OS MVP SPEC
 ==========================
-Status: In progress — M1 started on feature/wear-os-workout
+Status: Wear MVP M1–M5 on commercial/legal-compliance (Play Wear AAB)
 Date: 2026-07-20 (updated 2026-07-30)
 Branch: feature/wear-os-workout (from development)
 
@@ -48,9 +48,12 @@ MILESTONES (IMPLEMENTATION ORDER)
 ────────────────────────────────────────
 M1. Empty Wear app installs; opens “Y Walk”; talks to phone (hello sync)  ✓
 M2. Sync today schedule + strides phone → watch; Home screen  ✓
-M3. Free + scheduled Start/Finish; offline storage; simple classifier; UI fields  ← IN PROGRESS
-M4. Auto sync session → phone History
-M5. Play Wear packaging + privacy blurb + emulator test checklist
+M3. Free + scheduled Start/Finish; offline storage; simple classifier; UI fields  ✓
+M4. Auto sync session → phone History  ✓
+M5. Play Wear packaging + privacy blurb + emulator test checklist  ✓ (2026-09-18)
+    - Same applicationId as phone (com.ywalk.app); Wear OS form-factor track
+    - Signed AAB: versionCode 10001 / versionName 1.0.0
+    - See PLAY_STORE_WEAR.txt
 M6. (Post-MVP / stretch) Watch GPS mode — not started with MVP
 
 

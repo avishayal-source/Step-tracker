@@ -61,6 +61,9 @@ App name (max 30 chars):
 Short description (max 80 chars):
   Private step, walk & run tracker with a personal coach — all on your device.
 
+Must mention Wear OS in the listing (Play rejects Wear form-factor apps that don't):
+  Add a line such as: "Also on Wear OS — start today's workout from your watch."
+
 Full description (max 4000 chars):
   Y Walk is a privacy-first fitness tracker that counts your steps and tells
   walking, jogging and running apart automatically — no account, no sign-up,
@@ -74,6 +77,8 @@ Full description (max 4000 chars):
   • Botty, a personal training coach that builds a simple, realistic plan from
     your goal and adds dated workouts and reminders to your schedule.
   • Step-length calibration for a more personal distance estimate.
+  • Wear OS companion: start today's (or a free) workout on your watch; it
+    syncs back to History on the phone when nearby.
 
   PRIVACY FIRST
   • Works fully offline. The app does not transmit your workout data to us.

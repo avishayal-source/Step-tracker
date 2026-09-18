@@ -4,22 +4,46 @@ plugins {
     id 'org.jetbrains.kotlin.plugin.compose'
 }
 
+def keystorePropertiesFile = rootProject.file("keystore.properties")
+def keystoreProperties = new Properties()
+if (keystorePropertiesFile.exists()) {
+    keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+}
+
 android {
     namespace 'com.steptracker.wear'
     compileSdk 36
 
     defaultConfig {
+        // Same package as the phone app — required for the existing Play listing
+        // and the Wear OS form-factor track.
         applicationId "com.ywalk.app"
         minSdk 30
         targetSdk 36
-        versionCode 1
+        // Must not collide with phone versionCodes (1–15). Wear track is separate
+        // but Play still requires uniqueness across form factors.
+        versionCode 10001
         versionName "1.0.0"
+    }
+
+    signingConfigs {
+        release {
+            if (keystorePropertiesFile.exists()) {
+                storeFile file(keystoreProperties['storeFile'])
+                storePassword keystoreProperties['storePassword']
+                keyAlias keystoreProperties['keyAlias']
+                keyPassword keystoreProperties['keyPassword']
+            }
+        }
     }
 
     buildTypes {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            if (keystorePropertiesFile.exists()) {
+                signingConfig signingConfigs.release
+            }
         }
         debug {
             minifyEnabled false

@@ -267,6 +267,14 @@ private fun WearHomeScreen() {
                     modifier = Modifier.padding(top = 6.dp).fillMaxWidth()
                     ) { Text(stringResource(R.string.btn_start_free)) }
             }
+
+            Text(
+                text = stringResource(R.string.privacy_blurb),
+                modifier = Modifier.padding(top = 10.dp, bottom = 8.dp),
+                style = MaterialTheme.typography.caption2,
+                color = MaterialTheme.colors.onBackground.copy(alpha = 0.55f),
+                textAlign = TextAlign.Center
+            )
         }
     }
 }

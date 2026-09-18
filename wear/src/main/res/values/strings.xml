@@ -14,4 +14,5 @@
     <string name="strides_calibrated">Stride walk %1$.2fm · run %2$.2fm</string>
     <string name="strides_default">Stride (default) walk %1$.2fm · run %2$.2fm</string>
     <string name="synced_at">Synced %1$s</string>
+    <string name="privacy_blurb">Companion to Y Walk on the phone. Workouts stay on this watch until they sync. Not medical advice.</string>
 </resources>

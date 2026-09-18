@@ -1,0 +1,71 @@
+Y WALK — WEAR OS PLAY STORE
+===========================
+Date: 2026-09-18
+Package: com.ywalk.app  (SAME as the phone app — required)
+Signing: same release keystore as the phone AAB
+Artifact: wear/build/outputs/bundle/release/wear-release.aab
+versionCode: 10001   (must stay unique vs phone 1–15)
+versionName: 1.0.0
+
+Do NOT create a second Play app. Add a Wear OS form factor to the existing
+Y Walk listing, then upload this AAB on the Wear OS-only track.
+
+
+------------------------------------------------------------------------------
+1. PLAY CONSOLE — ADD WEAR OS
+------------------------------------------------------------------------------
+1. Open the existing Y Walk app (com.ywalk.app).
+2. Test and release → Advanced settings → Form factors → Add form factor
+   → Wear OS.
+3. Upload at least one Wear OS screenshot (round watch, app running).
+   Capture from Android Studio (Wear emulator or the Galaxy Watch):
+   home with due workout, live workout (timer/steps), Saved screen.
+   Typical size: 384×384 or 420×420 PNG; Play accepts Wear screenshots
+   from the Console Wear form-factor flow.
+4. Opt in to Wear OS and accept the Wear review policy.
+5. Create a release on the Wear OS closed/internal test track first
+   (Play requires closed testing before Wear production rollout).
+6. Upload wear-release.aab. Use the SAME upload key as the phone app.
+7. After a test release exists, Start rollout to production when ready.
+
+
+------------------------------------------------------------------------------
+2. LISTING COPY (must include the words "Wear OS")
+------------------------------------------------------------------------------
+Play rejects Wear apps whose store listing never says "Wear OS".
+
+Add to the existing listing short or full description:
+
+  Also on Wear OS: start today's walk/run from your watch. Workouts
+  continue if you lower your wrist, then sync to History on the phone.
+
+Watch-specific "what's new" for this first Wear upload:
+
+  • Start today's scheduled workout or a free session on Wear OS
+  • Steps, timer and distance on the watch
+  • Whistle + vibration at walk/run changes
+  • Auto-sync finished sessions to Y Walk on the phone
+
+
+------------------------------------------------------------------------------
+3. DATA SAFETY / PERMISSIONS (Wear form factor)
+------------------------------------------------------------------------------
+Same answers as the phone listing — nothing leaves the device.
+
+Wear uses:
+  • Activity recognition / body sensors — step counting while a workout runs
+  • Notifications — ongoing workout notification
+  • Foreground service (Health) — keep tracking when the screen is off
+  • No location on the watch (stride-only in this version)
+  • No account, no ads, no cloud
+
+Privacy policy URL (same as phone):
+  https://github.com/avishayal-source/Docs/blob/main/PRIVACY_POLICY.md
+
+
+------------------------------------------------------------------------------
+4. AFTER UPLOAD
+------------------------------------------------------------------------------
+Uninstall the debug Y Walk from the watch before installing from Play
+(same package name; Play will not overlay a differently signed debug build).
+Pair with the Play phone build so schedule + History sync keep working.
