@@ -42,6 +42,7 @@ class CoachView(
     private var lastProfile: RunPlanCoach.Profile? = null
     private var lastGoal: RunPlanCoach.Goal? = null
     private var lastPresentation: PlanSummaryBuilder.Presentation? = null
+    private var lastPreferContinuous = false
 
     // Intake
     private lateinit var intakePanel: View
@@ -56,6 +57,9 @@ class CoachView(
     private lateinit var etHeight: EditText
     private lateinit var etCurrentRun: EditText
     private lateinit var etDays: EditText
+    private lateinit var runStyleGroup: RadioGroup
+    private lateinit var styleIntervals: RadioButton
+    private lateinit var styleContinuous: RadioButton
     private lateinit var btnEvaluate: MaterialButton
 
     // Proposal results
@@ -98,6 +102,9 @@ class CoachView(
         etHeight     = root.findViewById(R.id.coachHeight)
         etCurrentRun = root.findViewById(R.id.coachCurrentRun)
         etDays       = root.findViewById(R.id.coachDaysPerWeek)
+        runStyleGroup = root.findViewById(R.id.coachRunStyle)
+        styleIntervals = root.findViewById(R.id.coachStyleIntervals)
+        styleContinuous = root.findViewById(R.id.coachStyleContinuous)
         btnEvaluate  = root.findViewById(R.id.coachBtnEvaluate)
 
         results     = root.findViewById(R.id.coachResults)
@@ -381,6 +388,7 @@ class CoachView(
         val days     = etDays.text.toString().toIntOrNull()
         val currentRun = etCurrentRun.text.toString().toDoubleOrNull() ?: 0.0
         val targetTime = etTime.text.toString().toDoubleOrNull()
+        val preferContinuous = styleContinuous.isChecked
 
         val missing = when {
             distance == null || distance <= 0 -> "a target distance"
@@ -419,6 +427,11 @@ class CoachView(
         saveInputs()
         lastProfile = profile
         lastGoal = goal
+        lastPreferContinuous = preferContinuous
+        UserPrefs(activity).let { up ->
+            up.heightCm = height!!.toFloat()
+            up.applyUncalibratedPeakDefaults()
+        }
         val result = RunPlanCoach.evaluate(profile, goal)
         lastResult = result
         lastPresentation = PlanSummaryBuilder.fromResult(result, profile, goal)
@@ -576,7 +589,8 @@ class CoachView(
         planStore.load()?.let { WorkoutReminderReceiver.cancelAll(activity, it) }
 
         val plan = PlanScheduler.generate(
-            result, profile, goal, startMidnightMs, warmupMin, cooldownMin, presentation
+            result, profile, goal, startMidnightMs, warmupMin, cooldownMin, presentation,
+            preferContinuous = lastPreferContinuous
         )
         planStore.clearDismissedPreviews()
         planStore.save(plan)
@@ -610,6 +624,7 @@ class CoachView(
             .putString("height", etHeight.text.toString())
             .putString("currentRun", etCurrentRun.text.toString())
             .putString("days", etDays.text.toString())
+            .putBoolean("preferContinuous", styleContinuous.isChecked)
             .apply()
     }
 
@@ -623,6 +638,11 @@ class CoachView(
         etHeight.setText(prefs.getString("height", ""))
         etCurrentRun.setText(prefs.getString("currentRun", ""))
         etDays.setText(prefs.getString("days", ""))
+        if (prefs.getBoolean("preferContinuous", false)) {
+            styleContinuous.isChecked = true
+        } else {
+            styleIntervals.isChecked = true
+        }
         if (prefs.getString("sex", "M") == "F") sexF.isChecked = true else sexM.isChecked = true
     }
 }

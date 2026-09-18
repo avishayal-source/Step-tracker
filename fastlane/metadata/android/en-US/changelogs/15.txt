@@ -1,0 +1,4 @@
+• Uncalibrated distance no longer ~2× too high (uses metres per detected step)
+• A new workout no longer re-saves the previous session’s totals
+• Botty: choose walk/jog intervals or continuous jogging
+• Wear OS workouts sync to History on the phone

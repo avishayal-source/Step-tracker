@@ -163,6 +163,9 @@ class StepTrackerService : Service(), StepDetector.StepListener {
 
     fun startTracking(initialType: ActivityType = ActivityType.WALKING) {
         if (isTracking) return
+        // A finished session keeps totals on screen until Reset; a new Start must
+        // not inherit them or the next Stop would save the old workout again.
+        resetData()
         isTracking     = true
         isPaused       = false
         historySaved   = false

@@ -30,6 +30,14 @@ class MainActivity : AppCompatActivity() {
     }
 
     private var wearSync: com.steptracker.app.wear.WearSyncManager? = null
+    private val watchImportedReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            updateHistoryUI()
+            if (::scheduleView.isInitialized) scheduleView.loadTodaysPlannedWorkout()
+            if (::coachView.isInitialized) coachView.onTabVisible()
+            wearSync?.syncTodayToWatches(showToast = false)
+        }
+    }
 
     private var service: StepTrackerService? = null
     private var isBound = false
@@ -131,6 +139,7 @@ class MainActivity : AppCompatActivity() {
         applyRootSystemBarInsets()
         userPrefs      = UserPrefs(this)
         workoutHistory = WorkoutHistory(this)
+        userPrefs.applyUncalibratedPeakDefaults()
 
         // Only discard genuinely unusable calibrations. The earlier 0.55 / 0.85 floors were
         // anatomical stride figures, but the counter registers about two peaks per stride
@@ -241,11 +250,19 @@ class MainActivity : AppCompatActivity() {
                 Toast.makeText(this, "⌚ Watch ping received", Toast.LENGTH_SHORT).show()
             }
         }.also { it.start() }
+
+        ContextCompat.registerReceiver(
+            this,
+            watchImportedReceiver,
+            IntentFilter(com.steptracker.app.wear.WearSessionImporter.ACTION_IMPORTED),
+            ContextCompat.RECEIVER_NOT_EXPORTED
+        )
     }
 
     override fun onResume() {
         super.onResume()
-        wearSync?.sendHelloToWatches()
+        wearSync?.sendHelloToWatches(showToast = false)
+        wearSync?.syncTodayToWatches(showToast = false)
     }
 
     private fun showMoreMenu(anchor: View) {
@@ -322,6 +339,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
+        try { unregisterReceiver(watchImportedReceiver) } catch (_: Exception) {}
         wearSync?.stop()
         wearSync = null
         stopwatchHandler.removeCallbacks(stopwatchRunnable)

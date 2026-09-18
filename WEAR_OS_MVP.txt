@@ -46,22 +46,37 @@ DECISIONS (from product Q&A)
 ────────────────────────────────────────
 MILESTONES (IMPLEMENTATION ORDER)
 ────────────────────────────────────────
-M1. Empty Wear app installs; opens “Y Walk”; talks to phone (hello sync)  ← IN PROGRESS
-M2. Sync today schedule + strides phone → watch; Home screen
-M3. Free + scheduled Start/Finish; offline storage; simple classifier; UI fields
+M1. Empty Wear app installs; opens “Y Walk”; talks to phone (hello sync)  ✓
+M2. Sync today schedule + strides phone → watch; Home screen  ✓
+M3. Free + scheduled Start/Finish; offline storage; simple classifier; UI fields  ← IN PROGRESS
 M4. Auto sync session → phone History
 M5. Play Wear packaging + privacy blurb + emulator test checklist
 M6. (Post-MVP / stretch) Watch GPS mode — not started with MVP
 
 
 ────────────────────────────────────────
-M1 NOTES (2026-07-30)
+M1 NOTES (2026-07-30 / updated 2026-09-16)
 ────────────────────────────────────────
-  - Module: :wear (applicationId com.steptracker.app.wear)
-  - Phone embeds wear via wearApp project(':wear')
-  - Data Layer paths: /ywalk/hello , /ywalk/ping
+  - Module: :wear (applicationId com.ywalk.app — same as phone for Data Layer)
+  - Paths: /ywalk/hello , /ywalk/ping , /ywalk/today , /ywalk/request_today
   - Capabilities: ywalk_phone / ywalk_watch
-  - Watch UI: Compose Material — title, link status, Ping phone button
+
+
+────────────────────────────────────────
+M2 NOTES (2026-09-16)
+────────────────────────────────────────
+  - Phone pushes next-due TrainingPlan workout periods + UserPrefs strides
+  - Watch caches JSON and shows due label + period list + strides
+  - Sync Today button (also auto-requests on open)
+
+
+────────────────────────────────────────
+M3 NOTES (2026-09-16)
+────────────────────────────────────────
+  - Start free / Start due on watch
+  - Accel peak steps + stride distance; scheduled periods advance on timer
+  - Finish stores session offline (phone History import = M4)
+  - Classifier still simple (period type / free=walk stride) — full gait later
 
 
 ────────────────────────────────────────

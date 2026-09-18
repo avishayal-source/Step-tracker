@@ -2,10 +2,16 @@
 <resources>
     <string name="app_name">Y Walk</string>
     <string name="home_title">Y Walk</string>
-    <string name="home_subtitle">Wear OS MVP</string>
+    <string name="home_subtitle">Wear OS</string>
     <string name="status_waiting">Waiting for phone…</string>
     <string name="status_connected">Phone linked</string>
-    <string name="btn_ping_phone">Ping phone</string>
-    <string name="ping_sent">Ping sent</string>
-    <string name="ping_failed">No phone nearby</string>
+    <string name="btn_sync_today">Sync today</string>
+    <string name="btn_start_due">Start due</string>
+    <string name="btn_start_free">Start free</string>
+    <string name="btn_open_workout">Open workout</string>
+    <string name="unsynced_sessions">%1$d workout(s) waiting to sync</string>
+    <string name="today_none">Open Y Walk on phone, then Sync today</string>
+    <string name="strides_calibrated">Stride walk %1$.2fm · run %2$.2fm</string>
+    <string name="strides_default">Stride (default) walk %1$.2fm · run %2$.2fm</string>
+    <string name="synced_at">Synced %1$s</string>
 </resources>

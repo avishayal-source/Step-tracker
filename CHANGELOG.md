@@ -3,6 +3,17 @@
 All notable changes to Y Walk are documented here. Versions follow the app's
 `versionName` (and `versionCode` in parentheses).
 
+## 1.0.14 (15) — 2026-09-18
+
+Tester fixes: uncalibrated distance, leftover session save, Botty jog style.
+
+- Uncalibrated walk/run length is now metres-per-peak (~half a stride), matching the
+  step counter; users who never calibrated no longer see ~1.5–2× distance
+- Starting a new workout clears the previous session so a short walk after a formal
+  workout is not saved as a near-duplicate History row
+- Botty asks whether you want walk/jog intervals or continuous jogging
+- Watch sessions sync into phone History; walk/run whistle + haptic on the watch
+
 ## 1.0.13 (14) — 2026-09-13
 
 Pause/Stop, Quick help, Wear M1 phone sync (Wear APK ships separately).

@@ -1057,6 +1057,29 @@ Start a tracking session to build your history."
                 <EditText android:id="@+id/coachDaysPerWeek" android:layout_width="match_parent" android:layout_height="wrap_content"
                     android:inputType="number" android:hint="3" android:textColorHint="@color/text_hint"
                     android:textColor="@color/text_primary" android:textSize="16sp" />
+
+                <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:text="How do you want to train?" android:textSize="12sp" android:textColor="@color/text_secondary" />
+                <RadioGroup
+                    android:id="@+id/coachRunStyle"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical">
+                    <RadioButton
+                        android:id="@+id/coachStyleIntervals"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="Walk/jog intervals (easier at the start)"
+                        android:textColor="@color/text_primary"
+                        android:checked="true" />
+                    <RadioButton
+                        android:id="@+id/coachStyleContinuous"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:text="Jog continuously when I can"
+                        android:textColor="@color/text_primary" />
+                </RadioGroup>
             </LinearLayout>
 
             <com.google.android.material.button.MaterialButton

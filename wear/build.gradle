@@ -9,7 +9,7 @@ android {
     compileSdk 36
 
     defaultConfig {
-        applicationId "com.ywalk.app.wear"
+        applicationId "com.ywalk.app"
         minSdk 30
         targetSdk 36
         versionCode 1

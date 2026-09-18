@@ -15,8 +15,8 @@ data class ActivityPeriod(
     // opening segment GPS never measured, so there is no jump at switchover.
     var stepDistanceAtGpsStartM: Double = 0.0,
     var gpsEngaged: Boolean = false,
-    var walkStride: Double = 0.78,   // raised default: avg adult walk ~0.78m
-    var runStride: Double  = 1.20    // raised default: avg adult jog ~1.20m
+    var walkStride: Double = UserPrefs.DEFAULT_WALK_STRIDE_M,
+    var runStride: Double  = UserPrefs.DEFAULT_RUN_STRIDE_M
 ) : Serializable {
     val durationMs: Long
         get() = if (endTime > 0) endTime - startTime else System.currentTimeMillis() - startTime

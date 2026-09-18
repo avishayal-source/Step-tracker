@@ -10,8 +10,8 @@ import kotlin.math.roundToInt
  * walk and cooldown walk wrapped around the main work.
  *
  * Distance is converted to time using a conservative easy-pace estimate (the plan is
- * built on easy, conversational running). Beginners get run/walk intervals instead of
- * continuous running, matching the engine's safety design.
+ * built on easy, conversational running). Beginners default to run/walk intervals;
+ * they can opt into continuous jogging from Botty's intake.
  */
 object PlanScheduler {
 
@@ -31,7 +31,8 @@ object PlanScheduler {
         startMidnightMs: Long,
         warmupMin: Int,
         cooldownMin: Int,
-        presentation: PlanSummaryBuilder.Presentation? = null
+        presentation: PlanSummaryBuilder.Presentation? = null,
+        preferContinuous: Boolean = false
     ): TrainingPlan {
         val beginner = profile.currentLongestRunKm < 1.0
         val easyPaceMinPerKm = if (beginner) 9.0 else 7.5
@@ -52,7 +53,7 @@ object PlanScheduler {
 
                 val items = ArrayList<ScheduleItem>()
                 if (warmupMin > 0) items.add(ScheduleItem(ActivityType.WALKING, warmupMin))
-                if (beginner && distanceKm < 4.0) {
+                if (beginner && distanceKm < 4.0 && !preferContinuous) {
                     // Run/walk intervals for early/mid beginner distance (Couch-to-5K style).
                     val reps = max(4, (mainMin / 3.0).roundToInt())
                     repeat(reps) {
