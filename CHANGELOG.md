@@ -3,6 +3,13 @@
 All notable changes to Y Walk are documented here. Versions follow the app's
 `versionName` (and `versionCode` in parentheses).
 
+## 1.0.15 (16) — 2026-09-19
+
+About screen and Wear overdue-day fix (closed testing / Beta).
+
+- ⋮ → About shows **Beta V1.0.15**, build number, and package id
+- Wear overdue label no longer shows milliseconds as “days late”
+
 ## 1.0.14 (15) — 2026-09-18
 
 Tester fixes: uncalibrated distance, leftover session save, Botty jog style.

@@ -288,10 +288,28 @@ class MainActivity : AppCompatActivity() {
                 R.id.action_terms -> {
                     startActivity(LegalDocActivity.terms(this)); true
                 }
+                R.id.action_about -> {
+                    showAbout(); true
+                }
                 else -> false
             }
         }
         popup.show()
+    }
+
+    private fun showAbout() {
+        AlertDialog.Builder(this)
+            .setTitle(R.string.about_title)
+            .setMessage(
+                getString(
+                    R.string.about_body,
+                    BuildConfig.VERSION_NAME,
+                    BuildConfig.VERSION_CODE,
+                    BuildConfig.APPLICATION_ID
+                )
+            )
+            .setPositiveButton(android.R.string.ok, null)
+            .show()
     }
 
     /** Toggles for the in-workout whistle cues and spoken progress, with an audible preview. */

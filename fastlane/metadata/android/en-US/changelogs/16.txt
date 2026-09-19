@@ -1,0 +1,2 @@
+• About in ⋮ menu: Beta version and build number
+• Wear OS overdue days display fixed

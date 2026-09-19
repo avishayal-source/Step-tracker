@@ -42,7 +42,7 @@ data class TodaySnapshot(
         return when {
             day == today -> "Today’s workout"
             day < today -> {
-                val late = (today - day).toInt()
+                val late = (today - day).toInt().coerceAtLeast(1)
                 "Overdue · $dateLabel (${late}d late)"
             }
             else -> "Upcoming · $dateLabel"
@@ -50,6 +50,7 @@ data class TodaySnapshot(
     }
 
     companion object {
+        /** Local-calendar day number — same formula as phone PlannedWorkout. */
         fun dayIndex(ms: Long): Long {
             val cal = Calendar.getInstance().apply {
                 timeInMillis = ms
@@ -58,7 +59,7 @@ data class TodaySnapshot(
                 set(Calendar.SECOND, 0)
                 set(Calendar.MILLISECOND, 0)
             }
-            return cal.timeInMillis
+            return cal.timeInMillis / 86_400_000L
         }
     }
 }
