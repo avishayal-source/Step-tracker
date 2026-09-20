@@ -145,10 +145,12 @@ class MainActivity : AppCompatActivity() {
         // anatomical stride figures, but the counter registers about two peaks per stride
         // while walking, so they wiped correct calibrations and no recalibration could
         // satisfy them — leaving users permanently nagged.
-        if (userPrefs.isCalibrated &&
-            (userPrefs.walkStrideM < 0.25 || userPrefs.runStrideM < 0.35)
+        if ((userPrefs.walkCalibrated && userPrefs.walkStrideM < 0.25) ||
+            (userPrefs.runCalibrated && userPrefs.runStrideM < 0.35)
         ) {
-            userPrefs.isCalibrated = false
+            if (userPrefs.walkCalibrated && userPrefs.walkStrideM < 0.25) userPrefs.walkCalibrated = false
+            if (userPrefs.runCalibrated && userPrefs.runStrideM < 0.35) userPrefs.runCalibrated = false
+            userPrefs.applyUncalibratedPeakDefaults()
             Toast.makeText(
                 this,
                 "Previous step lengths looked unusable — please recalibrate (⚙).",
@@ -551,9 +553,15 @@ class MainActivity : AppCompatActivity() {
         // ── Distance + step sizes ─────────────────────────────────────────────
         tvTotalDist.text = svc.formatDist(svc.walkDistM + svc.jogDistM + svc.runDistM)
 
-        val walkSizeStr = if (userPrefs.isCalibrated) "${"%.2f".format(userPrefs.walkStrideM)} m" else "–"
-        val runSizeStr  = if (userPrefs.isCalibrated) "${"%.2f".format(userPrefs.runStrideM)} m" else "–"
-        tvStepSizes.text = "Step:  🚶 $walkSizeStr   🏃 $runSizeStr"
+        val walkSizeStr = when {
+            userPrefs.walkCalibrated -> "${"%.2f".format(userPrefs.walkStrideM)} m"
+            else -> "${"%.2f".format(userPrefs.walkStrideM)} m (est.)"
+        }
+        val runSizeStr = when {
+            userPrefs.runCalibrated -> "${"%.2f".format(userPrefs.runStrideM)} m"
+            else -> "${"%.2f".format(userPrefs.runStrideM)} m (est.)"
+        }
+        tvStepSizes.text = "m/step:  🚶 $walkSizeStr   🏃 $runSizeStr"
 
         tvWalkStats.text = "🚶 Walk\n${svc.walkSteps} steps\n${svc.formatDist(svc.walkDistM)}"
         tvJogStats.text  = "🏃 Jog\n${svc.jogSteps} steps\n${svc.formatDist(svc.jogDistM)}"
@@ -661,14 +669,77 @@ class MainActivity : AppCompatActivity() {
             tvHistoryInsights.text = "✨ INSIGHTS\n\n" + insights.joinToString("\n")
         }
 
-        rvHistory.adapter = HistoryAdapter(records) { record ->
-            // Long-press → delete confirmation
-            AlertDialog.Builder(this).setTitle("Delete this workout?")
-                .setPositiveButton("Delete") { _, _ ->
-                    workoutHistory.delete(record.id)
-                    updateHistoryUI()
-                }.setNegativeButton("Cancel", null).show()
+        rvHistory.adapter = HistoryAdapter(
+            records,
+            onEdit = { record -> showEditWorkout(record) },
+            onDelete = { record ->
+                AlertDialog.Builder(this).setTitle("Delete this workout?")
+                    .setPositiveButton("Delete") { _, _ ->
+                        workoutHistory.delete(record.id)
+                        updateHistoryUI()
+                    }.setNegativeButton("Cancel", null).show()
+            }
+        )
+    }
+
+    private fun showEditWorkout(record: WorkoutRecord) {
+        val pad = (16 * resources.displayMetrics.density).toInt()
+        val form = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(pad, pad / 2, pad, 0)
         }
+        fun field(hint: String, value: String, decimal: Boolean): EditText {
+            val et = EditText(this).apply {
+                this.hint = hint
+                setText(value)
+                inputType = if (decimal)
+                    android.text.InputType.TYPE_CLASS_NUMBER or
+                        android.text.InputType.TYPE_NUMBER_FLAG_DECIMAL
+                else android.text.InputType.TYPE_CLASS_NUMBER
+            }
+            form.addView(et)
+            return et
+        }
+        val etWalkSteps = field("Walk steps", record.walkSteps.toString(), false)
+        val etRunSteps = field("Run steps", record.runSteps.toString(), false)
+        val etWalkKm = field("Walk distance (km)", "%.2f".format(record.walkDistM / 1000.0), true)
+        val etRunKm = field("Run distance (km)", "%.2f".format(record.runDistM / 1000.0), true)
+        val etWalkMin = field("Walk duration (min)", "%.1f".format(record.walkDurationMs / 60_000.0), true)
+        val etRunMin = field("Run duration (min)", "%.1f".format(record.runDurationMs / 60_000.0), true)
+
+        AlertDialog.Builder(this)
+            .setTitle("Edit workout")
+            .setMessage(record.dateLabel)
+            .setView(form)
+            .setPositiveButton("Save") { _, _ ->
+                val walkSteps = etWalkSteps.text.toString().toIntOrNull()
+                val runSteps = etRunSteps.text.toString().toIntOrNull()
+                val walkKm = etWalkKm.text.toString().toDoubleOrNull()
+                val runKm = etRunKm.text.toString().toDoubleOrNull()
+                val walkMin = etWalkMin.text.toString().toDoubleOrNull()
+                val runMin = etRunMin.text.toString().toDoubleOrNull()
+                if (walkSteps == null || runSteps == null || walkKm == null || runKm == null ||
+                    walkMin == null || runMin == null ||
+                    walkSteps < 0 || runSteps < 0 || walkKm < 0 || runKm < 0 || walkMin < 0 || runMin < 0
+                ) {
+                    Toast.makeText(this, "Enter valid non-negative numbers", Toast.LENGTH_LONG).show()
+                    return@setPositiveButton
+                }
+                workoutHistory.save(
+                    record.copy(
+                        walkSteps = walkSteps,
+                        runSteps = runSteps,
+                        walkDistM = walkKm * 1000.0,
+                        runDistM = runKm * 1000.0,
+                        walkDurationMs = (walkMin * 60_000.0).toLong(),
+                        runDurationMs = (runMin * 60_000.0).toLong()
+                    )
+                )
+                updateHistoryUI()
+                Toast.makeText(this, "Workout updated", Toast.LENGTH_SHORT).show()
+            }
+            .setNegativeButton("Cancel", null)
+            .show()
     }
 
     private fun formatDist(m: Double) = Format.dist(m)
@@ -692,7 +763,8 @@ class MainActivity : AppCompatActivity() {
 
 class HistoryAdapter(
     private val records: List<WorkoutRecord>,
-    private val onLongPress: (WorkoutRecord) -> Unit
+    private val onEdit: (WorkoutRecord) -> Unit,
+    private val onDelete: (WorkoutRecord) -> Unit
 ) : RecyclerView.Adapter<HistoryAdapter.VH>() {
 
     inner class VH(v: View) : RecyclerView.ViewHolder(v) {
@@ -719,6 +791,7 @@ class HistoryAdapter(
         h.tvWalk.text  = "🚶 ${fDist(r.walkDistM)}  ${fDur(r.walkDurationMs)}  ${r.walkSteps} steps"
         h.tvRun.text   = "🏃 ${fDist(r.runDistM)}  ${fDur(r.runDurationMs)}  ${r.runSteps} steps"
         h.tvTotal.text = "Total: ${fDist(r.totalDistM)}  ${r.totalSteps} steps"
-        h.itemView.setOnLongClickListener { onLongPress(r); true }
+        h.itemView.setOnClickListener { onEdit(r) }
+        h.itemView.setOnLongClickListener { onDelete(r); true }
     }
 }

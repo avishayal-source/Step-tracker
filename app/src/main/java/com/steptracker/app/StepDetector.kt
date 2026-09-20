@@ -171,6 +171,11 @@ class StepDetector(private val listener: StepListener) : SensorEventListener {
     private val SLOW_OVERRIDE_MS  = 40_000L
     private var slowSinceMs  = 0L
     private var slowStreakMs = 0L
+    private var motionBurstCount = 0
+    private var lastCountedWallMs = 0L
+    private val SIT_REJECT_PEAK = 2.0f
+    private val MOTION_BURST_MIN = 3
+    private val MOTION_BURST_GAP_MS = 2_500L
 
     // Leaky-bucket switch evidence. switchAccumMs accumulates time toward the pending
     // switch (stateCandidate) and drains when evidence reverses, so brief GPS wobble
@@ -444,7 +449,29 @@ class StepDetector(private val listener: StepListener) : SensorEventListener {
             emitDebug("step", wallMs, intervalMs, spm, filtered, inPlaceHold,
                 signalSource, desired, dwellMs, decisionReason, previousActivity)
         }
-        listener.onStep(wallMs, currentActivity)
+        if (shouldCountStep(peakMag, wallMs, haveFreshGps, filtered)) {
+            listener.onStep(wallMs, currentActivity)
+        }
+    }
+
+    /**
+     * Drop fidget / sitting peaks. With GPS, only count while moving; without GPS,
+     * require a short burst of impacts so isolated desk bumps do not become steps.
+     */
+    private fun shouldCountStep(
+        peakMag: Float,
+        wallMs: Long,
+        haveFreshGps: Boolean,
+        filtered: Double?
+    ): Boolean {
+        if (haveFreshGps && filtered != null) {
+            return filtered >= LOW_WALK_MPS
+        }
+        if (peakMag < SIT_REJECT_PEAK) return false
+        if (wallMs - lastCountedWallMs > MOTION_BURST_GAP_MS) motionBurstCount = 0
+        motionBurstCount++
+        lastCountedWallMs = wallMs
+        return motionBurstCount >= MOTION_BURST_MIN
     }
 
     private fun emitDebug(
@@ -497,6 +524,7 @@ class StepDetector(private val listener: StepListener) : SensorEventListener {
         currentActivity = seedActivity
         peaks.reset(); lastPeakMag = 0f
         slowSinceMs = 0L; slowStreakMs = 0L
+        motionBurstCount = 0; lastCountedWallMs = 0L
         offsetInitialised = false
         stateCandidate = null; switchAccumMs = 0.0
         kalmanInitialised = false; kalmanX = 0.0; kalmanP = 1.0; lastKalmanGain = null

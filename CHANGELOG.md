@@ -3,6 +3,16 @@
 All notable changes to Y Walk are documented here. Versions follow the app's
 `versionName` (and `versionCode` in parentheses).
 
+## 1.0.16 (17) — 2026-09-20
+
+Closed-testing fixes from tester feedback.
+
+- Fewer false steps while sitting (GPS motion gate + burst filter; slightly higher peak threshold)
+- Calibration: stop counting immediately on Stop; clearer impacts vs footfalls copy
+- Walk and run step lengths calibrated separately; estimates labeled `(est.)`
+- Tap a History workout to edit; long-press still deletes
+- Schedule duration − uses a proper minus icon (not backspace)
+
 ## 1.0.15 (16) — 2026-09-19
 
 About screen and Wear overdue-day fix (closed testing / Beta).

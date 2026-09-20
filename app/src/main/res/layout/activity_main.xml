@@ -647,7 +647,7 @@ Start a tracking session to build your history."
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Long-press a workout to delete it"
+            android:text="Tap a workout to edit · long-press to delete"
             android:gravity="center"
             android:textSize="11sp"
             android:textColor="@color/text_secondary"

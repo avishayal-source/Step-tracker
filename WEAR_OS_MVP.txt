@@ -52,7 +52,7 @@ M3. Free + scheduled Start/Finish; offline storage; simple classifier; UI fields
 M4. Auto sync session → phone History  ✓
 M5. Play Wear packaging + privacy blurb + emulator test checklist  ✓ (2026-09-18)
     - Same applicationId as phone (com.ywalk.app); Wear OS form-factor track
-    - Signed AAB: versionCode 10002 / versionName 1.0.1
+    - Signed AAB: versionCode 10003 / versionName 1.0.2
     - See PLAY_STORE_WEAR.txt
 M6. (Post-MVP / stretch) Watch GPS mode — not started with MVP
 

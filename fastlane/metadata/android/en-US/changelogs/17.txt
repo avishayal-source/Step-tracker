@@ -1,0 +1,5 @@
+• Fewer false steps while sitting still
+• Calibration stop no longer keeps counting; clearer footfall vs impact copy
+• Separate walk/run calibration; estimates labeled (est.)
+• Tap History to edit a workout
+• Schedule − button is a real minus

@@ -74,6 +74,8 @@ object BackupManager {
                 put("walk_stride", userPrefs.walkStrideM)
                 put("run_stride", userPrefs.runStrideM)
                 put("calibrated", userPrefs.isCalibrated)
+                put("walk_calibrated", userPrefs.walkCalibrated)
+                put("run_calibrated", userPrefs.runCalibrated)
                 put("height_cm", userPrefs.heightCm.toDouble())
             })
             put("coachPrefs", coachObj)
@@ -162,7 +164,9 @@ object BackupManager {
         if (up != null) {
             if (up.has("walk_stride")) userPrefs.walkStrideM = up.getDouble("walk_stride")
             if (up.has("run_stride")) userPrefs.runStrideM = up.getDouble("run_stride")
-            if (up.has("calibrated")) userPrefs.isCalibrated = up.getBoolean("calibrated")
+            if (up.has("walk_calibrated")) userPrefs.walkCalibrated = up.getBoolean("walk_calibrated")
+            if (up.has("run_calibrated")) userPrefs.runCalibrated = up.getBoolean("run_calibrated")
+            else if (up.has("calibrated")) userPrefs.isCalibrated = up.getBoolean("calibrated")
             if (up.has("height_cm")) userPrefs.heightCm = up.getDouble("height_cm").toFloat()
         }
 

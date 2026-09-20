@@ -57,15 +57,18 @@ class CalibrationActivity : AppCompatActivity(), SensorEventListener {
 
     private var calibratingJog = false
     private var phase = Phase.SELECT
+    private var counting = false
     private var stepCount = 0
     private var gpsDistanceM = 0.0
     private var lastLocation: Location? = null
     private var computedStride = 0.0
+    /** Detected peaks (tracker units). UI also shows ~footfalls ≈ peaks/2. */
     private val MIN_STEPS = 40
     private val MIN_GPS_DIST_M = 20.0
 
     private val locationListener = object : LocationListener {
         override fun onLocationChanged(loc: Location) {
+            if (!counting) return
             if (loc.hasAccuracy() && loc.accuracy > 15f) return
             lastLocation?.let { prev ->
                 val delta = prev.distanceTo(loc).toDouble()
@@ -147,12 +150,14 @@ class CalibrationActivity : AppCompatActivity(), SensorEventListener {
     }
 
     override fun onDestroy() {
+        counting = false
         super.onDestroy()
         sensorManager.unregisterListener(this)
         try { locationManager?.removeUpdates(locationListener) } catch (_: Exception) {}
     }
 
     private fun showPhase(p: Phase) {
+        counting = false
         phase = p
         sensorManager.unregisterListener(this)
         try { locationManager?.removeUpdates(locationListener) } catch (_: Exception) {}
@@ -172,11 +177,13 @@ class CalibrationActivity : AppCompatActivity(), SensorEventListener {
                 val Verb = if (calibratingJog) "Jog" else "Walk"
                 tvTitle.text = "Calibrate $Verb Step Length"
                 tvInstructions.text =
-                    "Tap Start, then $verb in a straight line on flat open ground for at " +
-                    "least $MIN_STEPS steps (aim for 40–80 m). Tap Stop when done.\n\n" +
+                    "Tap Start, then $verb in a straight line on flat open ground for about " +
+                    "40–50 footfalls (aim for 40–80 m). Tap Stop when done.\n\n" +
+                    "The counter shows detected impacts — usually about twice your footfalls " +
+                    "(so ~40 footfalls may read near 80). That is expected.\n\n" +
                     "GPS needs ~${MIN_GPS_DIST_M.toInt()} m of good signal. If GPS is weak, " +
                     "${verb} a known marked distance instead."
-                tvStepCount.text = "0 steps"
+                tvStepCount.text = "0 impacts (~0 footfalls)"
                 tvDistance.text  = "—"
                 tvGpsStatus.text = "GPS: waiting for fix…"
                 btnStart.visibility = View.VISIBLE
@@ -189,9 +196,10 @@ class CalibrationActivity : AppCompatActivity(), SensorEventListener {
                 val current = if (calibratingJog) userPrefs.runStrideM else userPrefs.walkStrideM
                 val distUsed = if (gpsDistanceM >= MIN_GPS_DIST_M) gpsDistanceM else computedStride * stepCount
                 val heightNote = expectedStrideNote()
+                val footfalls = (stepCount / UserPrefs.PEAKS_PER_STRIDE).toInt()
                 tvStride.text =
-                    "Measured:  ${"%.3f".format(computedStride)} m/step\n" +
-                    "Steps taken:  $stepCount\n" +
+                    "Measured:  ${"%.3f".format(computedStride)} m per detected step\n" +
+                    "Detected impacts:  $stepCount  (~$footfalls footfalls)\n" +
                     "Distance used:  ${"%.1f".format(distUsed)} m\n\n" +
                     "Previously saved:  ${"%.3f".format(current)} m/step" +
                     heightNote
@@ -219,6 +227,7 @@ class CalibrationActivity : AppCompatActivity(), SensorEventListener {
     }
 
     private fun startCounting() {
+        counting = false
         stepCount = 0; gpsDistanceM = 0.0; lastLocation = null; peaks.reset()
         btnStart.visibility = View.GONE
         btnStop.visibility  = View.VISIBLE
@@ -226,6 +235,7 @@ class CalibrationActivity : AppCompatActivity(), SensorEventListener {
 
         val accel = sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER)
         sensorManager.registerListener(this, accel, SensorManager.SENSOR_DELAY_GAME)
+        counting = true
 
         val hasFine = ActivityCompat.checkSelfPermission(this,
             Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
@@ -274,26 +284,33 @@ class CalibrationActivity : AppCompatActivity(), SensorEventListener {
     }
 
     private fun stopCounting() {
+        counting = false
         sensorManager.unregisterListener(this)
         try { locationManager?.removeUpdates(locationListener) } catch (_: Exception) {}
         btnStart.visibility = View.VISIBLE
         btnStop.visibility  = View.GONE
 
-        if (stepCount < MIN_STEPS) {
-            Toast.makeText(this, "Need at least $MIN_STEPS steps. Got $stepCount — keep going!",
-                Toast.LENGTH_SHORT).show()
+        val finalSteps = stepCount
+        val finalDist = gpsDistanceM
+
+        if (finalSteps < MIN_STEPS) {
+            Toast.makeText(
+                this,
+                "Need at least $MIN_STEPS detected impacts (~${MIN_STEPS / 2} footfalls). Got $finalSteps — keep going!",
+                Toast.LENGTH_SHORT
+            ).show()
             return
         }
 
-        if (gpsDistanceM >= MIN_GPS_DIST_M) {
-            computedStride = gpsDistanceM / stepCount
+        if (finalDist >= MIN_GPS_DIST_M) {
+            computedStride = finalDist / finalSteps
             showPhase(Phase.RESULT)
         } else {
-            askManualDistance()
+            askManualDistance(finalSteps, finalDist)
         }
     }
 
-    private fun askManualDistance() {
+    private fun askManualDistance(finalSteps: Int = stepCount, finalDist: Double = gpsDistanceM) {
         val verb = if (calibratingJog) "jogged" else "walked"
         val et = EditText(this).apply {
             hint = "e.g. 50.0"
@@ -304,15 +321,16 @@ class CalibrationActivity : AppCompatActivity(), SensorEventListener {
         android.app.AlertDialog.Builder(this)
             .setTitle("Enter distance $verb (metres)")
             .setMessage(
-                "GPS only recorded ${"%.1f".format(gpsDistanceM)} m " +
+                "GPS only recorded ${"%.1f".format(finalDist)} m " +
                     "(need ≥${MIN_GPS_DIST_M.toInt()} m outdoors).\n\n" +
-                    "How many metres did you $verb?\nSteps counted: $stepCount"
+                    "How many metres did you $verb?\nDetected impacts: $finalSteps " +
+                    "(~${(finalSteps / UserPrefs.PEAKS_PER_STRIDE).toInt()} footfalls)"
             )
             .setView(et)
             .setPositiveButton("Calculate") { _, _ ->
                 val dist = et.text.toString().toDoubleOrNull()
                 if (dist != null && dist >= 15.0) {
-                    computedStride = dist / stepCount
+                    computedStride = dist / finalSteps
                     showPhase(Phase.RESULT)
                 } else {
                     Toast.makeText(this, "Enter at least 15 metres for a usable average",
@@ -338,9 +356,13 @@ class CalibrationActivity : AppCompatActivity(), SensorEventListener {
                 Toast.LENGTH_LONG).show()
             return
         }
-        if (calibratingJog) userPrefs.runStrideM  = computedStride
-        else                userPrefs.walkStrideM = computedStride
-        userPrefs.isCalibrated = true
+        if (calibratingJog) {
+            userPrefs.runStrideM = computedStride
+            userPrefs.runCalibrated = true
+        } else {
+            userPrefs.walkStrideM = computedStride
+            userPrefs.walkCalibrated = true
+        }
         val verb = if (calibratingJog) "jog" else "walk"
         Toast.makeText(this, "✓ Saved $verb step length: ${"%.3f".format(computedStride)} m",
             Toast.LENGTH_LONG).show()
@@ -350,6 +372,7 @@ class CalibrationActivity : AppCompatActivity(), SensorEventListener {
     override fun onAccuracyChanged(sensor: Sensor?, accuracy: Int) {}
 
     override fun onSensorChanged(event: SensorEvent) {
+        if (!counting) return
         if (event.sensor.type != Sensor.TYPE_ACCELEROMETER) return
         peaks.onSample(
             event.values[0], event.values[1], event.values[2], System.currentTimeMillis()
@@ -359,7 +382,8 @@ class CalibrationActivity : AppCompatActivity(), SensorEventListener {
     }
 
     private fun updateCountingUI() {
-        tvStepCount.text = "$stepCount steps"
+        val footfalls = (stepCount / UserPrefs.PEAKS_PER_STRIDE).toInt()
+        tvStepCount.text = "$stepCount impacts (~$footfalls footfalls)"
         tvDistance.text  = if (gpsDistanceM >= 0.5)
             "${"%.1f".format(gpsDistanceM)} m (GPS)"
         else

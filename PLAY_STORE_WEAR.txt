@@ -4,8 +4,8 @@ Date: 2026-09-18
 Package: com.ywalk.app  (SAME as the phone app — required)
 Signing: same release keystore as the phone AAB
 Artifact: wear/build/outputs/bundle/release/wear-release.aab
-versionCode: 10002   (must stay unique vs phone codes)
-versionName: 1.0.1
+versionCode: 10003   (must stay unique vs phone codes)
+versionName: 1.0.2
 
 Do NOT create a second Play app. Add a Wear OS form factor to the existing
 Y Walk listing, then upload this AAB on the Wear OS-only track.

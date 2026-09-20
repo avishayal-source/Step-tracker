@@ -16,8 +16,33 @@ class UserPrefs(context: Context) {
         set(v) { prefs.edit().putFloat("run_stride", v.toFloat()).apply() }
 
     var isCalibrated: Boolean
-        get() = prefs.getBoolean("calibrated", false)
-        set(v) { prefs.edit().putBoolean("calibrated", v).apply() }
+        get() = walkCalibrated || runCalibrated
+        set(v) {
+            // Legacy setter used by backups / clear-bad-calib: both gaits together.
+            prefs.edit()
+                .putBoolean("calibrated", v)
+                .putBoolean("walk_calibrated", v)
+                .putBoolean("run_calibrated", v)
+                .apply()
+        }
+
+    var walkCalibrated: Boolean
+        get() = prefs.getBoolean("walk_calibrated", prefs.getBoolean("calibrated", false))
+        set(v) {
+            prefs.edit()
+                .putBoolean("walk_calibrated", v)
+                .putBoolean("calibrated", v || prefs.getBoolean("run_calibrated", false))
+                .apply()
+        }
+
+    var runCalibrated: Boolean
+        get() = prefs.getBoolean("run_calibrated", prefs.getBoolean("calibrated", false))
+        set(v) {
+            prefs.edit()
+                .putBoolean("run_calibrated", v)
+                .putBoolean("calibrated", prefs.getBoolean("walk_calibrated", false) || v)
+                .apply()
+        }
 
     /** Optional height for anthropometric stride suggestions (cm). 0 = unset. */
     var heightCm: Float
@@ -65,10 +90,9 @@ class UserPrefs(context: Context) {
                 PEAKS_PER_STRIDE
     }
 
-    /** Replace leftover anatomical defaults for users who never calibrated. */
+    /** Replace leftover anatomical defaults only for gaits that were never calibrated. */
     fun applyUncalibratedPeakDefaults() {
-        if (isCalibrated) return
-        walkStrideM = peakWalkStrideM(heightCm)
-        runStrideM = peakRunStrideM(heightCm)
+        if (!walkCalibrated) walkStrideM = peakWalkStrideM(heightCm)
+        if (!runCalibrated) runStrideM = peakRunStrideM(heightCm)
     }
 }

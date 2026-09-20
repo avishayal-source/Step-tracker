@@ -44,7 +44,7 @@ class StepPeakDetector {
 
     private companion object {
         const val GRAVITY_ALPHA = 0.80f
-        const val STEP_THRESHOLD = 1.5f
-        const val MIN_STEP_MS = 230L
+        const val STEP_THRESHOLD = 1.8f
+        const val MIN_STEP_MS = 280L
     }
 }

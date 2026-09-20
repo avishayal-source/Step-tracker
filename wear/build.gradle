@@ -22,8 +22,8 @@ android {
         targetSdk 36
         // Must not collide with phone versionCodes. Wear track is separate
         // but Play still requires uniqueness across form factors.
-        versionCode 10002
-        versionName "1.0.1"
+        versionCode 10003
+        versionName "1.0.2"
     }
 
     signingConfigs {
