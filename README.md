@@ -25,7 +25,8 @@ Android app for live step counting, walk/run classification, GPS distance, inter
 
 ## Requirements
 
-- Android **8.0+** (API 26), target SDK 34
+- Android **8.0+** (API 26), **target / compile SDK 36** (Android 16 — Play requirement as of Aug 2026)
+- Wear OS module: min SDK 30, target SDK 36
 - Device with **accelerometer** (required)
 - Optional: step counter hardware, GPS for distance calibration and tracking
 
