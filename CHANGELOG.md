@@ -3,6 +3,18 @@
 All notable changes to Y Walk are documented here. Versions follow the app's
 `versionName` (and `versionCode` in parentheses).
 
+## 1.0.17 (18) — 2026-09-24
+
+Calories, Tracking pastel restyle, and closed-testing UI/sensor fixes.
+
+- Estimated calories from Botty weight (MET × time; pace-banded); shown in History
+- Tracking restyle: white canvas, mint Today card, peach/pink activity cards, black Start
+- Flame icon opens calorie estimate (or prompts for weight)
+- Large system fonts: scrollable tabs, auto-sizing titles, wrap-height buttons
+- More page padding on Tracking / History / Help / Onboarding
+- Harder to invent steps by waving the phone (no-GPS gait burst + interval gate)
+- Onboarding Agree stays gray/disabled until both checkboxes are checked
+
 ## 1.0.16 (17) — 2026-09-20
 
 Closed-testing fixes from tester feedback.
