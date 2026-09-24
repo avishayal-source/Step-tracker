@@ -20,7 +20,9 @@ data class WorkoutRecord(
     val walkDistM: Double,
     val runDistM: Double,
     val walkDurationMs: Long,
-    val runDurationMs: Long
+    val runDurationMs: Long,
+    /** Estimated kilocalories; 0 when weight was unknown at save time. */
+    val caloriesKcal: Int = 0
 ) {
     val totalDistM   get() = walkDistM + runDistM
     val totalSteps   get() = walkSteps + runSteps

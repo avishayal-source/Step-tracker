@@ -640,6 +640,7 @@ class MainActivity : AppCompatActivity() {
     // ── History UI ────────────────────────────────────────────────────────────
 
     private fun updateHistoryUI() {
+        workoutHistory.backfillCalories(CoachProfile.weightKg(this))
         val records = workoutHistory.loadAll()
         tvHistoryEmpty.visibility = if (records.isEmpty()) View.VISIBLE else View.GONE
         rvHistory.visibility      = if (records.isEmpty()) View.GONE    else View.VISIBLE
@@ -655,10 +656,19 @@ class MainActivity : AppCompatActivity() {
         val totalRunDist  = records.sumOf { it.runDistM }
         val totalWalkMs   = records.sumOf { it.walkDurationMs }
         val totalRunMs    = records.sumOf { it.runDurationMs }
+        val totalKcal     = records.sumOf { it.caloriesKcal }
+        val kcalLine = if (totalKcal > 0) {
+            "\n🔥 ${Format.kcal(totalKcal)} (est.)"
+        } else if (CoachProfile.weightKg(this) == null) {
+            "\n🔥 Add your weight in Botty to estimate calories"
+        } else {
+            ""
+        }
         tvHistorySummary.text =
             "ALL TIME  ·  ${records.size} workouts\n" +
             "🚶 ${formatDist(totalWalkDist)}  ${formatDur(totalWalkMs)}\n" +
-            "🏃 ${formatDist(totalRunDist)}  ${formatDur(totalRunMs)}"
+            "🏃 ${formatDist(totalRunDist)}  ${formatDur(totalRunMs)}" +
+            kcalLine
 
         // Auto-generated insights (#A): pace trend, streak, frequency, PBs.
         val insights = WorkoutInsights.compute(records)
@@ -725,14 +735,26 @@ class MainActivity : AppCompatActivity() {
                     Toast.makeText(this, "Enter valid non-negative numbers", Toast.LENGTH_LONG).show()
                     return@setPositiveButton
                 }
+                val walkMs = (walkMin * 60_000.0).toLong()
+                val runMs = (runMin * 60_000.0).toLong()
+                val walkDist = walkKm * 1000.0
+                val runDist = runKm * 1000.0
+                val kcal = CaloriesCalculator.estimateKcal(
+                    weightKg = CoachProfile.weightKg(this),
+                    walkDurationMs = walkMs,
+                    runDurationMs = runMs,
+                    walkDistM = walkDist,
+                    runDistM = runDist
+                )
                 workoutHistory.save(
                     record.copy(
                         walkSteps = walkSteps,
                         runSteps = runSteps,
-                        walkDistM = walkKm * 1000.0,
-                        runDistM = runKm * 1000.0,
-                        walkDurationMs = (walkMin * 60_000.0).toLong(),
-                        runDurationMs = (runMin * 60_000.0).toLong()
+                        walkDistM = walkDist,
+                        runDistM = runDist,
+                        walkDurationMs = walkMs,
+                        runDurationMs = runMs,
+                        caloriesKcal = kcal
                     )
                 )
                 updateHistoryUI()
@@ -790,7 +812,8 @@ class HistoryAdapter(
         h.tvDate.text  = r.dateLabel
         h.tvWalk.text  = "🚶 ${fDist(r.walkDistM)}  ${fDur(r.walkDurationMs)}  ${r.walkSteps} steps"
         h.tvRun.text   = "🏃 ${fDist(r.runDistM)}  ${fDur(r.runDurationMs)}  ${r.runSteps} steps"
-        h.tvTotal.text = "Total: ${fDist(r.totalDistM)}  ${r.totalSteps} steps"
+        val kcalPart = Format.kcal(r.caloriesKcal).let { if (it.isNotEmpty()) "  ·  $it" else "" }
+        h.tvTotal.text = "Total: ${fDist(r.totalDistM)}  ${fDur(r.totalDurMs)}  ${r.totalSteps} steps$kcalPart"
         h.itemView.setOnClickListener { onEdit(r) }
         h.itemView.setOnLongClickListener { onDelete(r); true }
     }

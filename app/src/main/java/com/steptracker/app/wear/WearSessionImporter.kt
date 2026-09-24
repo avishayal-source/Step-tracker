@@ -4,6 +4,8 @@ import android.content.Context
 import android.content.Intent
 import android.util.Log
 import com.google.android.gms.wearable.Wearable
+import com.steptracker.app.CaloriesCalculator
+import com.steptracker.app.CoachProfile
 import com.steptracker.app.TrainingPlanStore
 import com.steptracker.app.WorkoutHistory
 import com.steptracker.app.WorkoutRecord
@@ -43,6 +45,13 @@ object WearSessionImporter {
         val walkDurationMs = o.optLong("walkDurationMs", durationMs)
         val runDurationMs = o.optLong("runDurationMs", 0L)
 
+        val kcal = CaloriesCalculator.estimateKcal(
+            weightKg = CoachProfile.weightKg(context),
+            walkDurationMs = walkDurationMs,
+            runDurationMs = runDurationMs,
+            walkDistM = walkDistM,
+            runDistM = runDistM
+        )
         WorkoutHistory(context).save(
             WorkoutRecord(
                 id = recordId(sid, started),
@@ -52,7 +61,8 @@ object WearSessionImporter {
                 walkDistM = walkDistM,
                 runDistM = runDistM,
                 walkDurationMs = walkDurationMs,
-                runDurationMs = runDurationMs
+                runDurationMs = runDurationMs,
+                caloriesKcal = kcal
             )
         )
 

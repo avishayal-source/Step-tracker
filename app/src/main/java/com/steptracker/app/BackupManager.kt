@@ -52,6 +52,7 @@ object BackupManager {
                 put("runDistM", w.runDistM)
                 put("walkDurationMs", w.walkDurationMs)
                 put("runDurationMs", w.runDurationMs)
+                put("caloriesKcal", w.caloriesKcal)
             })
         }
 
@@ -138,7 +139,8 @@ object BackupManager {
                     walkDistM = o.getDouble("walkDistM"),
                     runDistM = o.getDouble("runDistM"),
                     walkDurationMs = o.getLong("walkDurationMs"),
-                    runDurationMs = o.getLong("runDurationMs")
+                    runDurationMs = o.getLong("runDurationMs"),
+                    caloriesKcal = o.optInt("caloriesKcal", 0)
                 )
             )
         }

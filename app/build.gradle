@@ -83,4 +83,6 @@ dependencies {
     // Do not use wearApp embedding: phone is com.ywalk.app, watch is
     // com.ywalk.app.wear (required for independent Wear listing). AGP rejects
     // mismatched package names in :app:handleReleaseMicroApk. Ship Wear separately.
+
+    testImplementation 'junit:junit:4.13.2'
 }
