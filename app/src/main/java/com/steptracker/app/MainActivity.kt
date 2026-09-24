@@ -76,7 +76,9 @@ class MainActivity : AppCompatActivity() {
     private lateinit var btnStartStop: MaterialButton
     private lateinit var btnStopSession: MaterialButton
     private lateinit var btnReset: MaterialButton
-    private lateinit var btnCalibrate: MaterialButton
+    private lateinit var btnCalibrate: ImageButton
+    private lateinit var btnCalories: ImageButton
+    private lateinit var tvTodayLabel: TextView
     private lateinit var layoutTimeline: LinearLayout
     private lateinit var timelineBar: LinearLayout
     private lateinit var tvLogTotals: TextView
@@ -179,6 +181,8 @@ class MainActivity : AppCompatActivity() {
         btnStopSession    = findViewById(R.id.btnStopSession)
         btnReset          = findViewById(R.id.btnReset)
         btnCalibrate      = findViewById(R.id.btnCalibrate)
+        btnCalories       = findViewById(R.id.btnCalories)
+        tvTodayLabel      = findViewById(R.id.tvTodayLabel)
         layoutTimeline    = findViewById(R.id.layoutTimeline)
         timelineBar       = findViewById(R.id.timelineBar)
         tvLogTotals       = findViewById(R.id.tvLogTotals)
@@ -196,6 +200,7 @@ class MainActivity : AppCompatActivity() {
         btnStopSession.setOnClickListener { stopTrackingSession() }
         btnReset.setOnClickListener     { confirmReset() }
         btnCalibrate.setOnClickListener { startActivity(Intent(this, CalibrationActivity::class.java)) }
+        btnCalories.setOnClickListener { showCaloriesSummary() }
 
         findViewById<View>(R.id.btnMore).setOnClickListener { anchor -> showMoreMenu(anchor) }
 
@@ -499,13 +504,44 @@ class MainActivity : AppCompatActivity() {
         stopwatchHandler.post(stopwatchRunnable)
     }
 
+    private fun showCaloriesSummary() {
+        workoutHistory.backfillCalories(CoachProfile.weightKg(this))
+        val records = workoutHistory.loadAll()
+        val totalKcal = records.sumOf { it.caloriesKcal }
+        val weight = CoachProfile.weightKg(this)
+        val message = when {
+            weight == null ->
+                "Add your weight in Botty so Y Walk can estimate calories for your workouts."
+            totalKcal <= 0 ->
+                "No calorie estimates yet. Finish a tracked session and they'll show up here."
+            else ->
+                "Estimated burn (all time):\n\n${Format.kcal(totalKcal)}\n\n" +
+                    "Based on your Botty weight (${"%.0f".format(weight)} kg) and walk/run time. " +
+                    "Estimates only — not medical advice."
+        }
+        val builder = AlertDialog.Builder(this)
+            .setTitle("Calories")
+            .setMessage(message)
+            .setNegativeButton("OK", null)
+        when {
+            weight == null -> builder.setPositiveButton("Open Botty") { _, _ ->
+                tabLayout.getTabAt(3)?.select()
+            }
+            else -> builder.setPositiveButton("View History") { _, _ ->
+                tabLayout.getTabAt(2)?.select()
+            }
+        }
+        builder.show()
+    }
+
     // ── Tracking UI ───────────────────────────────────────────────────────────
 
     private fun updateTrackingUI() {
         val svc = service ?: return
 
         // ── Step count + timer ────────────────────────────────────────────────
-        tvStepCount.text = svc.totalSteps.toString()
+        tvStepCount.text = java.text.NumberFormat.getIntegerInstance().format(svc.totalSteps)
+        tvTodayLabel.text = if (svc.isTracking) "Session" else "Today"
         val showElapsed = svc.isTracking
         tvSessionElapsed.text = if (showElapsed) formatElapsed(svc.sessionElapsedMs()) else "00:00"
         tvSessionElapsed.visibility      = if (showElapsed) View.VISIBLE else View.GONE
@@ -515,28 +551,27 @@ class MainActivity : AppCompatActivity() {
         val activityType = svc.currentPeriod?.type
         tvCurrentActivity.text = when {
             !svc.isTracking -> "Not tracking"
-            svc.isPaused -> "⏸ Paused"
-            activityType == ActivityType.RUNNING -> "🏃 Running"
-            activityType == ActivityType.JOGGING -> "🏃 Jogging"
-            activityType == ActivityType.WALKING -> "🚶 Walking"
-            else            -> "⏸ Idle"
+            svc.isPaused -> "Paused"
+            activityType == ActivityType.RUNNING -> "Running"
+            activityType == ActivityType.JOGGING -> "Jogging"
+            activityType == ActivityType.WALKING -> "Walking"
+            else            -> "Idle"
         }
         val pillColor = when {
             !svc.isTracking -> ContextCompat.getColor(this, R.color.surface_elevated)
             svc.isPaused -> ContextCompat.getColor(this, R.color.surface_elevated)
-            activityType == ActivityType.RUNNING -> 0xBFFF5722.toInt()   // coral-orange
-            activityType == ActivityType.JOGGING -> 0xBFFFA000.toInt()   // amber (mid tier)
-            activityType == ActivityType.WALKING -> 0xBF14B86A.toInt()   // emerald
+            activityType == ActivityType.RUNNING -> ContextCompat.getColor(this, R.color.pink_card)
+            activityType == ActivityType.JOGGING -> ContextCompat.getColor(this, R.color.pink_card)
+            activityType == ActivityType.WALKING -> ContextCompat.getColor(this, R.color.peach_card)
             else            -> ContextCompat.getColor(this, R.color.surface_elevated)
         }
         tvCurrentActivity.backgroundTintList = ColorStateList.valueOf(pillColor)
-        // White text on the coloured "tracking" pill, dark text on the light idle pill
         val pillTextColor = when {
-            !svc.isTracking -> ContextCompat.getColor(this, R.color.text_primary)
+            !svc.isTracking -> ContextCompat.getColor(this, R.color.mint_text)
             activityType == ActivityType.RUNNING ||
-            activityType == ActivityType.JOGGING ||
-            activityType == ActivityType.WALKING -> 0xFFFFFFFF.toInt()
-            else -> ContextCompat.getColor(this, R.color.text_primary)
+            activityType == ActivityType.JOGGING -> ContextCompat.getColor(this, R.color.pink_text)
+            activityType == ActivityType.WALKING -> ContextCompat.getColor(this, R.color.peach_text)
+            else -> ContextCompat.getColor(this, R.color.mint_text)
         }
         tvCurrentActivity.setTextColor(pillTextColor)
 
@@ -545,9 +580,9 @@ class MainActivity : AppCompatActivity() {
             this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
         tvGpsIndicator.text = when {
             !svc.isTracking  -> ""
-            !hasFineLocation -> "⚠ No GPS"
-            svc.gpsAvailable -> "📍 GPS active"
-            else             -> "⌛ GPS acquiring…"
+            !hasFineLocation -> "No GPS"
+            svc.gpsAvailable -> "GPS active"
+            else             -> "GPS acquiring…"
         }
 
         // ── Distance + step sizes ─────────────────────────────────────────────
@@ -561,11 +596,12 @@ class MainActivity : AppCompatActivity() {
             userPrefs.runCalibrated -> "${"%.2f".format(userPrefs.runStrideM)} m"
             else -> "${"%.2f".format(userPrefs.runStrideM)} m (est.)"
         }
-        tvStepSizes.text = "m/step:  🚶 $walkSizeStr   🏃 $runSizeStr"
+        tvStepSizes.text = "m/step:  walk $walkSizeStr   run $runSizeStr"
 
-        tvWalkStats.text = "🚶 Walk\n${svc.walkSteps} steps\n${svc.formatDist(svc.walkDistM)}"
-        tvJogStats.text  = "🏃 Jog\n${svc.jogSteps} steps\n${svc.formatDist(svc.jogDistM)}"
-        tvRunStats.text  = "🏃 Run\n${svc.runSteps} steps\n${svc.formatDist(svc.runDistM)}"
+        val nf = java.text.NumberFormat.getIntegerInstance()
+        tvWalkStats.text = "${nf.format(svc.walkSteps)}\nwalk steps\n${svc.formatDist(svc.walkDistM)}"
+        tvJogStats.text  = "${nf.format(svc.jogSteps)}\njog steps\n${svc.formatDist(svc.jogDistM)}"
+        tvRunStats.text  = "${nf.format(svc.runSteps)}\nrun steps\n${svc.formatDist(svc.runDistM)}"
 
         // ── Buttons ───────────────────────────────────────────────────────────
         when {
@@ -605,9 +641,9 @@ class MainActivity : AppCompatActivity() {
                 periods.forEachIndexed { i, p ->
                     val seg = View(this)
                     val color = when (p.type) {
-                        ActivityType.RUNNING -> 0xFFFF5722.toInt()   // coral-orange
-                        ActivityType.JOGGING -> 0xFFFFA000.toInt()   // amber
-                        else                 -> 0xFF14B86A.toInt()   // emerald (walk)
+                        ActivityType.RUNNING -> ContextCompat.getColor(this, R.color.pink_text)
+                        ActivityType.JOGGING -> 0xFFC45A64.toInt()
+                        else                 -> ContextCompat.getColor(this, R.color.peach_text)
                     }
                     seg.setBackgroundColor(color)
                     val weight = p.durationMs.toFloat() / totalMs

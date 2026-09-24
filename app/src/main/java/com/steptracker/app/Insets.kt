@@ -3,8 +3,8 @@ package com.steptracker.app
 import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
-import android.widget.ImageView
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
@@ -39,7 +39,7 @@ fun AppCompatActivity.applyRootSystemBarInsets() {
     ViewCompat.requestApplyInsets(insetTarget)
 }
 
-/** Wraps the activity content root in a FrameLayout with a full-bleed background. */
+/** Wraps the activity content root in a FrameLayout with a solid pastel canvas. */
 private fun wrapRootWithBackground(content: ViewGroup): View {
     val original = content.getChildAt(0) ?: return content
     if (original.tag == BG_WRAPPED_TAG) {
@@ -50,9 +50,8 @@ private fun wrapRootWithBackground(content: ViewGroup): View {
         layoutParams = original.layoutParams
         tag = BG_WRAPPED_TAG
     }
-    val bg = ImageView(content.context).apply {
-        setImageResource(R.drawable.ywalk_background)
-        scaleType = ImageView.ScaleType.CENTER_CROP
+    val bg = View(content.context).apply {
+        setBackgroundColor(ContextCompat.getColor(content.context, R.color.bg_canvas))
         layoutParams = FrameLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT,
             ViewGroup.LayoutParams.MATCH_PARENT
