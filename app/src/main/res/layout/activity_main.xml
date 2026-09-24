@@ -12,7 +12,7 @@
         android:layout_height="wrap_content"
         android:orientation="horizontal"
         android:gravity="center_vertical"
-        android:paddingHorizontal="20dp"
+        android:paddingHorizontal="24dp"
         android:paddingTop="12dp"
         android:paddingBottom="8dp"
         android:background="@android:color/transparent">
@@ -20,22 +20,32 @@
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_weight="1"
-            android:orientation="vertical">
+            android:orientation="vertical"
+            android:paddingEnd="8dp">
             <TextView
-                android:layout_width="wrap_content"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="@string/app_name"
-                android:textSize="28sp"
+                android:textSize="26sp"
                 android:textColor="@color/text_primary"
-                android:fontFamily="sans-serif-black" />
+                android:fontFamily="sans-serif-black"
+                android:maxLines="1"
+                android:ellipsize="end"
+                android:includeFontPadding="false"
+                app:autoSizeTextType="uniform"
+                app:autoSizeMinTextSize="18sp"
+                app:autoSizeMaxTextSize="26sp"
+                app:autoSizeStepGranularity="1sp" />
             <TextView
-                android:layout_width="wrap_content"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:text="why walk, when you can run"
                 android:textSize="13sp"
                 android:textColor="@color/text_secondary"
                 android:fontFamily="sans-serif"
-                android:layout_marginTop="2dp" />
+                android:layout_marginTop="2dp"
+                android:maxLines="2"
+                android:ellipsize="end" />
         </LinearLayout>
 
         <ImageButton
@@ -60,14 +70,20 @@
             android:padding="10dp" />
     </LinearLayout>
 
-    <!-- Tabs -->
+    <!-- Tabs: scrollable so large system fonts don't wrap "Tracking" / "Schedule" -->
     <com.google.android.material.tabs.TabLayout
         android:id="@+id/tabLayout"
         android:layout_width="match_parent"
-        android:layout_height="48dp"
+        android:layout_height="wrap_content"
+        android:minHeight="48dp"
+        android:paddingHorizontal="8dp"
         android:background="@android:color/transparent"
-        app:tabMode="fixed"
-        app:tabGravity="fill"
+        app:tabMode="scrollable"
+        app:tabGravity="start"
+        app:tabMinWidth="72dp"
+        app:tabPaddingStart="12dp"
+        app:tabPaddingEnd="12dp"
+        app:tabTextAppearance="@style/TextAppearance.YWalk.Tab"
         app:tabTextColor="@color/text_secondary"
         app:tabSelectedTextColor="@color/text_primary"
         app:tabIndicatorColor="@color/accent"
@@ -109,7 +125,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:paddingHorizontal="16dp"
+            android:paddingHorizontal="24dp"
             android:paddingTop="16dp"
             android:paddingBottom="28dp">
 
@@ -339,12 +355,15 @@
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnStartStop"
                     android:layout_width="0dp"
-                    android:layout_height="56dp"
+                    android:layout_height="wrap_content"
+                    android:minHeight="56dp"
                     android:layout_weight="1"
                     android:text="▶  Start"
                     android:textSize="17sp"
                     android:textAllCaps="false"
                     android:textColor="@color/btn_on_primary"
+                    android:maxLines="1"
+                    android:ellipsize="end"
                     app:cornerRadius="28dp"
                     android:backgroundTint="@color/btn_primary"
                     app:rippleColor="#33FFFFFF" />
@@ -352,12 +371,15 @@
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnStopSession"
                     android:layout_width="wrap_content"
-                    android:layout_height="56dp"
+                    android:layout_height="wrap_content"
+                    android:minHeight="56dp"
                     android:text="■ Stop"
                     android:textSize="13sp"
                     android:textAllCaps="false"
                     android:textColor="@color/text_primary"
                     android:layout_marginStart="8dp"
+                    android:maxLines="1"
+                    android:ellipsize="end"
                     app:cornerRadius="28dp"
                     android:backgroundTint="@color/surface_elevated"
                     app:strokeColor="@color/divider"
@@ -367,7 +389,8 @@
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnReset"
                     android:layout_width="wrap_content"
-                    android:layout_height="56dp"
+                    android:layout_height="wrap_content"
+                    android:minHeight="56dp"
                     android:text="↺"
                     android:textSize="16sp"
                     android:textAllCaps="false"
@@ -450,7 +473,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="horizontal"
-            android:layout_marginHorizontal="16dp"
+            android:layout_marginHorizontal="20dp"
             android:layout_marginTop="12dp"
             android:paddingHorizontal="16dp"
             android:paddingVertical="12dp"
@@ -482,7 +505,7 @@
             android:layout_width="match_parent"
             android:layout_height="0dp"
             android:layout_weight="1"
-            android:paddingHorizontal="12dp"
+            android:paddingHorizontal="16dp"
             android:paddingVertical="6dp"
             android:clipToPadding="false" />
 
@@ -619,7 +642,7 @@
             android:id="@+id/tvHistorySummary"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_margin="16dp"
+            android:layout_margin="20dp"
             android:padding="18dp"
             android:textSize="13sp"
             android:textColor="@color/text_primary"
@@ -631,7 +654,7 @@
             android:id="@+id/tvHistoryInsights"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginHorizontal="16dp"
+            android:layout_marginHorizontal="20dp"
             android:layout_marginBottom="12dp"
             android:padding="16dp"
             android:textSize="13sp"

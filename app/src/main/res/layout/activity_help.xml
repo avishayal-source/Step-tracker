@@ -5,37 +5,64 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:padding="24dp"
-    android:background="@drawable/bg_app_image">
+    android:paddingStart="28dp"
+    android:paddingEnd="28dp"
+    android:paddingTop="20dp"
+    android:paddingBottom="24dp"
+    android:background="@color/bg_canvas"
+    android:clipToPadding="false"
+    android:clipChildren="false">
 
     <TextView
         android:id="@+id/tvHelpBrand"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Y Walk"
-        android:textSize="28sp"
+        android:text="@string/app_name"
+        android:textSize="26sp"
         android:textStyle="bold"
         android:textColor="@color/accent"
-        android:letterSpacing="0.02" />
+        android:maxLines="1"
+        android:ellipsize="end"
+        android:includeFontPadding="false"
+        android:paddingStart="2dp"
+        android:paddingEnd="2dp"
+        app:autoSizeTextType="uniform"
+        app:autoSizeMinTextSize="18sp"
+        app:autoSizeMaxTextSize="26sp"
+        app:autoSizeStepGranularity="1sp" />
 
     <TextView
         android:id="@+id/tvHelpTitle"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="12dp"
-        android:textSize="22sp"
+        android:layout_marginTop="14dp"
+        android:textSize="20sp"
         android:textStyle="bold"
-        android:textColor="@color/text_primary" />
+        android:textColor="@color/text_primary"
+        android:maxLines="3"
+        android:ellipsize="end"
+        app:autoSizeTextType="uniform"
+        app:autoSizeMinTextSize="16sp"
+        app:autoSizeMaxTextSize="20sp"
+        app:autoSizeStepGranularity="1sp" />
 
-    <TextView
-        android:id="@+id/tvHelpBody"
+    <ScrollView
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
-        android:layout_marginTop="16dp"
-        android:textSize="16sp"
-        android:lineSpacingMultiplier="1.35"
-        android:textColor="@color/text_secondary" />
+        android:layout_marginTop="14dp"
+        android:fillViewport="true"
+        android:overScrollMode="ifContentScrolls">
+
+        <TextView
+            android:id="@+id/tvHelpBody"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textSize="16sp"
+            android:lineSpacingMultiplier="1.35"
+            android:textColor="@color/text_secondary"
+            android:paddingBottom="8dp" />
+    </ScrollView>
 
     <TextView
         android:id="@+id/tvHelpPage"
@@ -44,6 +71,7 @@
         android:gravity="center"
         android:textSize="12sp"
         android:textColor="@color/text_hint"
+        android:layout_marginTop="8dp"
         android:layout_marginBottom="12dp" />
 
     <LinearLayout
@@ -54,10 +82,14 @@
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnHelpSkip"
             android:layout_width="0dp"
-            android:layout_height="52dp"
+            android:layout_height="wrap_content"
+            android:minHeight="52dp"
             android:layout_weight="1"
             android:text="Skip"
+            android:textAllCaps="false"
             android:textColor="@color/text_primary"
+            android:maxLines="1"
+            android:ellipsize="end"
             app:cornerRadius="26dp"
             android:backgroundTint="@color/surface_elevated"
             app:strokeColor="@color/text_hint"
@@ -66,10 +98,14 @@
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnHelpNext"
             android:layout_width="0dp"
-            android:layout_height="52dp"
+            android:layout_height="wrap_content"
+            android:minHeight="52dp"
             android:layout_weight="1"
             android:layout_marginStart="8dp"
             android:text="Next"
+            android:textAllCaps="false"
+            android:maxLines="1"
+            android:ellipsize="end"
             app:cornerRadius="26dp"
             android:backgroundTint="@color/accent" />
     </LinearLayout>

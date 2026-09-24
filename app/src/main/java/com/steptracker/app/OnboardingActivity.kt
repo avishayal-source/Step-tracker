@@ -30,7 +30,12 @@ class OnboardingActivity : AppCompatActivity() {
         val btnAgree = findViewById<MaterialButton>(R.id.btnAgree)
         val btnDecline = findViewById<MaterialButton>(R.id.btnDecline)
 
-        val gate = { btnAgree.isEnabled = cb.isChecked && cbAge.isChecked }
+        val gate = {
+            val ready = cb.isChecked && cbAge.isChecked
+            btnAgree.isEnabled = ready
+            btnAgree.alpha = if (ready) 1f else 0.85f
+        }
+        gate()
         cb.setOnCheckedChangeListener { _, _ -> gate() }
         cbAge.setOnCheckedChangeListener { _, _ -> gate() }
 

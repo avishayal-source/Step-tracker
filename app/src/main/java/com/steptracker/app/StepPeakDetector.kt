@@ -59,8 +59,8 @@ class StepPeakDetector {
 
     private companion object {
         const val GRAVITY_ALPHA  = 0.80f
-        /** Slightly above desk/pocket fidget; still shared by tracking + calibration. */
-        const val STEP_THRESHOLD = 1.8f
+        /** Above typical desk/hand fidget; shared by tracking + calibration. */
+        const val STEP_THRESHOLD = 2.1f
         const val MIN_STEP_MS    = 280L
     }
 }

@@ -171,11 +171,15 @@ class StepDetector(private val listener: StepListener) : SensorEventListener {
     private val SLOW_OVERRIDE_MS  = 40_000L
     private var slowSinceMs  = 0L
     private var slowStreakMs = 0L
+    // Hand-wave / pocket fidget rejection (no GPS): need a short run of gait-like peaks.
+    private val SIT_REJECT_PEAK = 2.6f
+    private val MOTION_BURST_MIN = 6
+    private val MOTION_BURST_GAP_MS = 1_800L
+    /** Peak spacing that looks like walking/running; outside → reset the burst. */
+    private val GAIT_INTERVAL_MIN_MS = 280L
+    private val GAIT_INTERVAL_MAX_MS = 950L
     private var motionBurstCount = 0
     private var lastCountedWallMs = 0L
-    private val SIT_REJECT_PEAK = 2.0f
-    private val MOTION_BURST_MIN = 3
-    private val MOTION_BURST_GAP_MS = 2_500L
 
     // Leaky-bucket switch evidence. switchAccumMs accumulates time toward the pending
     // switch (stateCandidate) and drains when evidence reverses, so brief GPS wobble
@@ -449,18 +453,20 @@ class StepDetector(private val listener: StepListener) : SensorEventListener {
             emitDebug("step", wallMs, intervalMs, spm, filtered, inPlaceHold,
                 signalSource, desired, dwellMs, decisionReason, previousActivity)
         }
-        if (shouldCountStep(peakMag, wallMs, haveFreshGps, filtered)) {
+        if (shouldCountStep(peakMag, wallMs, intervalMs, haveFreshGps, filtered)) {
             listener.onStep(wallMs, currentActivity)
         }
     }
 
     /**
-     * Drop fidget / sitting peaks. With GPS, only count while moving; without GPS,
-     * require a short burst of impacts so isolated desk bumps do not become steps.
+     * Drop fidget / sitting / hand-wave peaks. With GPS, only count while moving;
+     * without GPS, require a short burst of gait-like impacts so waving the phone
+     * does not invent a walk.
      */
     private fun shouldCountStep(
         peakMag: Float,
         wallMs: Long,
+        intervalMs: Long,
         haveFreshGps: Boolean,
         filtered: Double?
     ): Boolean {
@@ -468,6 +474,11 @@ class StepDetector(private val listener: StepListener) : SensorEventListener {
             return filtered >= LOW_WALK_MPS
         }
         if (peakMag < SIT_REJECT_PEAK) return false
+        // Hand waves are strong but irregular; real gait stays in a stride window.
+        if (intervalMs < GAIT_INTERVAL_MIN_MS || intervalMs > GAIT_INTERVAL_MAX_MS) {
+            motionBurstCount = 0
+            return false
+        }
         if (wallMs - lastCountedWallMs > MOTION_BURST_GAP_MS) motionBurstCount = 0
         motionBurstCount++
         lastCountedWallMs = wallMs
