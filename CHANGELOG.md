@@ -8,6 +8,8 @@ All notable changes to Y Walk are documented here. Versions follow the app's
 Pixel / closed-testing fixes (calibration carry position, GPS visibility, screen-off).
 
 - Calibration: recommend pocket carry; warn when result looks like full-stride (hand)
+- Calibration: reject walk lengths longer than ~85% of anatomical stride (e.g. 0.94 m
+  for a 1.75 m walker) — that is bad GPS / missed impacts, not a real step
 - Tracking shows Location status even before Start so GPS grant is harder to miss
 - Ask once for unrestricted battery so sensors keep running with screen off (Pixel)
 - Foreground service restarts more reliably (`START_STICKY`)
