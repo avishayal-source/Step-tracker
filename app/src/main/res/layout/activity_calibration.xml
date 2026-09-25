@@ -58,7 +58,7 @@
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:text="Your height helps reject unrealistic step lengths.\nCalibrate outdoors on flat ground when possible."
+            android:text="Your height helps reject unrealistic step lengths.\nCalibrate outdoors on flat ground.\n\nUse the same phone position as your workouts — usually a pocket. Holding the phone in your hand often counts fewer impacts and makes step length look almost twice as long."
             android:textSize="13sp"
             android:textColor="@color/text_secondary"
             android:gravity="center"

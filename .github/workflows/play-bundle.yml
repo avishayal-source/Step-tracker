@@ -1,0 +1,50 @@
+name: Play App Bundle
+
+on:
+  workflow_dispatch:
+    inputs:
+      ref_note:
+        description: "Optional note for this build"
+        required: false
+        default: ""
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  bundle:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Prepare release signing
+        env:
+          YWALK_KEYSTORE_BASE64: ${{ secrets.YWALK_KEYSTORE_BASE64 }}
+          YWALK_STORE_PASSWORD: ${{ secrets.YWALK_STORE_PASSWORD }}
+          YWALK_KEY_ALIAS: ${{ secrets.YWALK_KEY_ALIAS }}
+          YWALK_KEY_PASSWORD: ${{ secrets.YWALK_KEY_PASSWORD }}
+        run: |
+          chmod +x scripts/prepare-release-signing.sh
+          ./scripts/prepare-release-signing.sh
+
+      - name: Build release bundle
+        run: |
+          chmod +x gradlew
+          ./gradlew :app:bundleRelease --no-daemon
+
+      - name: Upload AAB
+        uses: actions/upload-artifact@v4
+        with:
+          name: YWalk-play-aab
+          path: app/build/outputs/bundle/release/app-release.aab
+          if-no-files-found: error

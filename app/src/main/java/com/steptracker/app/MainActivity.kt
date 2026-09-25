@@ -10,6 +10,8 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
+import android.os.PowerManager
+import android.provider.Settings
 import android.view.*
 import android.widget.*
 import androidx.activity.result.contract.ActivityResultContracts
@@ -76,7 +78,9 @@ class MainActivity : AppCompatActivity() {
     private lateinit var btnStartStop: MaterialButton
     private lateinit var btnStopSession: MaterialButton
     private lateinit var btnReset: MaterialButton
-    private lateinit var btnCalibrate: MaterialButton
+    private lateinit var btnCalibrate: ImageButton
+    private lateinit var btnCalories: ImageButton
+    private lateinit var tvTodayLabel: TextView
     private lateinit var layoutTimeline: LinearLayout
     private lateinit var timelineBar: LinearLayout
     private lateinit var tvLogTotals: TextView
@@ -179,6 +183,8 @@ class MainActivity : AppCompatActivity() {
         btnStopSession    = findViewById(R.id.btnStopSession)
         btnReset          = findViewById(R.id.btnReset)
         btnCalibrate      = findViewById(R.id.btnCalibrate)
+        btnCalories       = findViewById(R.id.btnCalories)
+        tvTodayLabel      = findViewById(R.id.tvTodayLabel)
         layoutTimeline    = findViewById(R.id.layoutTimeline)
         timelineBar       = findViewById(R.id.timelineBar)
         tvLogTotals       = findViewById(R.id.tvLogTotals)
@@ -196,6 +202,7 @@ class MainActivity : AppCompatActivity() {
         btnStopSession.setOnClickListener { stopTrackingSession() }
         btnReset.setOnClickListener     { confirmReset() }
         btnCalibrate.setOnClickListener { startActivity(Intent(this, CalibrationActivity::class.java)) }
+        btnCalories.setOnClickListener { showCaloriesSummary() }
 
         findViewById<View>(R.id.btnMore).setOnClickListener { anchor -> showMoreMenu(anchor) }
 
@@ -377,6 +384,12 @@ class MainActivity : AppCompatActivity() {
         add(Manifest.permission.ACCESS_COARSE_LOCATION)
     }.toTypedArray()
 
+    private fun hasLocationPerm(): Boolean =
+        ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) ==
+            PackageManager.PERMISSION_GRANTED ||
+            ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) ==
+                PackageManager.PERMISSION_GRANTED
+
     private fun hasTrackingPerms() = (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q)
         listOf(Manifest.permission.ACTIVITY_RECOGNITION) else emptyList())
         .all { ContextCompat.checkSelfPermission(this, it) == PackageManager.PERMISSION_GRANTED }
@@ -396,6 +409,7 @@ class MainActivity : AppCompatActivity() {
                 Toast.makeText(this, "Activity permission required for step tracking",
                     Toast.LENGTH_LONG).show()
             }
+            updateTrackingUI()
         }
     }
 
@@ -414,6 +428,7 @@ class MainActivity : AppCompatActivity() {
                 svc.pauseTracking()
                 updateTrackingUI()
             }
+            // Only prompt when something is still missing — never every Start.
             hasTrackingPerms() -> startTrackingService()
             else -> requestTrackingPermissions()
         }
@@ -497,6 +512,76 @@ class MainActivity : AppCompatActivity() {
         // a duplicate ServiceConnection (which Android reports as a leak).
         stopwatchHandler.removeCallbacks(stopwatchRunnable)
         stopwatchHandler.post(stopwatchRunnable)
+        maybeOfferBatteryUnrestricted()
+        updateTrackingUI()
+    }
+
+    /**
+     * Pixel / OEM battery savers often pause sensors when the screen is off unless the
+     * app is allowed to run unrestricted. Ask once — not on every Start.
+     */
+    private fun maybeOfferBatteryUnrestricted() {
+        if (userPrefs.askedBatteryUnrestricted) return
+        val pm = getSystemService(PowerManager::class.java) ?: return
+        if (pm.isIgnoringBatteryOptimizations(packageName)) {
+            userPrefs.askedBatteryUnrestricted = true
+            return
+        }
+        userPrefs.askedBatteryUnrestricted = true
+        AlertDialog.Builder(this)
+            .setTitle(R.string.battery_unrestricted_title)
+            .setMessage(R.string.battery_unrestricted_message)
+            .setPositiveButton(R.string.battery_unrestricted_allow) { _, _ ->
+                try {
+                    startActivity(
+                        Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+                            data = Uri.parse("package:$packageName")
+                        }
+                    )
+                } catch (_: Exception) {
+                    try {
+                        startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
+                    } catch (_: Exception) {
+                        Toast.makeText(
+                            this,
+                            R.string.battery_unrestricted_open_settings_fail,
+                            Toast.LENGTH_LONG
+                        ).show()
+                    }
+                }
+            }
+            .setNegativeButton(R.string.battery_unrestricted_not_now, null)
+            .show()
+    }
+
+    private fun showCaloriesSummary() {
+        workoutHistory.backfillCalories(CoachProfile.weightKg(this))
+        val records = workoutHistory.loadAll()
+        val totalKcal = records.sumOf { it.caloriesKcal }
+        val weight = CoachProfile.weightKg(this)
+        val message = when {
+            weight == null ->
+                "Add your weight in Botty so Y Walk can estimate calories for your workouts."
+            totalKcal <= 0 ->
+                "No calorie estimates yet. Finish a tracked session and they'll show up here."
+            else ->
+                "Estimated burn (all time):\n\n${Format.kcal(totalKcal)}\n\n" +
+                    "Based on your Botty weight (${"%.0f".format(weight)} kg) and walk/run time. " +
+                    "Estimates only — not medical advice."
+        }
+        val builder = AlertDialog.Builder(this)
+            .setTitle("Calories")
+            .setMessage(message)
+            .setNegativeButton("OK", null)
+        when {
+            weight == null -> builder.setPositiveButton("Open Botty") { _, _ ->
+                tabLayout.getTabAt(3)?.select()
+            }
+            else -> builder.setPositiveButton("View History") { _, _ ->
+                tabLayout.getTabAt(2)?.select()
+            }
+        }
+        builder.show()
     }
 
     // ── Tracking UI ───────────────────────────────────────────────────────────
@@ -505,7 +590,8 @@ class MainActivity : AppCompatActivity() {
         val svc = service ?: return
 
         // ── Step count + timer ────────────────────────────────────────────────
-        tvStepCount.text = svc.totalSteps.toString()
+        tvStepCount.text = java.text.NumberFormat.getIntegerInstance().format(svc.totalSteps)
+        tvTodayLabel.text = if (svc.isTracking) "Session" else "Today"
         val showElapsed = svc.isTracking
         tvSessionElapsed.text = if (showElapsed) formatElapsed(svc.sessionElapsedMs()) else "00:00"
         tvSessionElapsed.visibility      = if (showElapsed) View.VISIBLE else View.GONE
@@ -515,39 +601,37 @@ class MainActivity : AppCompatActivity() {
         val activityType = svc.currentPeriod?.type
         tvCurrentActivity.text = when {
             !svc.isTracking -> "Not tracking"
-            svc.isPaused -> "⏸ Paused"
-            activityType == ActivityType.RUNNING -> "🏃 Running"
-            activityType == ActivityType.JOGGING -> "🏃 Jogging"
-            activityType == ActivityType.WALKING -> "🚶 Walking"
-            else            -> "⏸ Idle"
+            svc.isPaused -> "Paused"
+            activityType == ActivityType.RUNNING -> "Running"
+            activityType == ActivityType.JOGGING -> "Jogging"
+            activityType == ActivityType.WALKING -> "Walking"
+            else            -> "Idle"
         }
         val pillColor = when {
             !svc.isTracking -> ContextCompat.getColor(this, R.color.surface_elevated)
             svc.isPaused -> ContextCompat.getColor(this, R.color.surface_elevated)
-            activityType == ActivityType.RUNNING -> 0xBFFF5722.toInt()   // coral-orange
-            activityType == ActivityType.JOGGING -> 0xBFFFA000.toInt()   // amber (mid tier)
-            activityType == ActivityType.WALKING -> 0xBF14B86A.toInt()   // emerald
+            activityType == ActivityType.RUNNING -> ContextCompat.getColor(this, R.color.pink_card)
+            activityType == ActivityType.JOGGING -> ContextCompat.getColor(this, R.color.pink_card)
+            activityType == ActivityType.WALKING -> ContextCompat.getColor(this, R.color.peach_card)
             else            -> ContextCompat.getColor(this, R.color.surface_elevated)
         }
         tvCurrentActivity.backgroundTintList = ColorStateList.valueOf(pillColor)
-        // White text on the coloured "tracking" pill, dark text on the light idle pill
         val pillTextColor = when {
-            !svc.isTracking -> ContextCompat.getColor(this, R.color.text_primary)
+            !svc.isTracking -> ContextCompat.getColor(this, R.color.mint_text)
             activityType == ActivityType.RUNNING ||
-            activityType == ActivityType.JOGGING ||
-            activityType == ActivityType.WALKING -> 0xFFFFFFFF.toInt()
-            else -> ContextCompat.getColor(this, R.color.text_primary)
+            activityType == ActivityType.JOGGING -> ContextCompat.getColor(this, R.color.pink_text)
+            activityType == ActivityType.WALKING -> ContextCompat.getColor(this, R.color.peach_text)
+            else -> ContextCompat.getColor(this, R.color.mint_text)
         }
         tvCurrentActivity.setTextColor(pillTextColor)
 
-        // ── GPS indicator ─────────────────────────────────────────────────────
-        val hasFineLocation = ContextCompat.checkSelfPermission(
-            this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+        // ── GPS indicator (also when idle, so Location grant is not easy to miss) ─
+        val hasFineLocation = hasLocationPerm()
         tvGpsIndicator.text = when {
-            !svc.isTracking  -> ""
-            !hasFineLocation -> "⚠ No GPS"
-            svc.gpsAvailable -> "📍 GPS active"
-            else             -> "⌛ GPS acquiring…"
+            !hasFineLocation -> "Location off — tap Start once to enable GPS distance"
+            !svc.isTracking  -> "Location on"
+            svc.gpsAvailable -> "GPS active"
+            else             -> "GPS acquiring…"
         }
 
         // ── Distance + step sizes ─────────────────────────────────────────────
@@ -561,11 +645,12 @@ class MainActivity : AppCompatActivity() {
             userPrefs.runCalibrated -> "${"%.2f".format(userPrefs.runStrideM)} m"
             else -> "${"%.2f".format(userPrefs.runStrideM)} m (est.)"
         }
-        tvStepSizes.text = "m/step:  🚶 $walkSizeStr   🏃 $runSizeStr"
+        tvStepSizes.text = "m/step:  walk $walkSizeStr   run $runSizeStr"
 
-        tvWalkStats.text = "🚶 Walk\n${svc.walkSteps} steps\n${svc.formatDist(svc.walkDistM)}"
-        tvJogStats.text  = "🏃 Jog\n${svc.jogSteps} steps\n${svc.formatDist(svc.jogDistM)}"
-        tvRunStats.text  = "🏃 Run\n${svc.runSteps} steps\n${svc.formatDist(svc.runDistM)}"
+        val nf = java.text.NumberFormat.getIntegerInstance()
+        tvWalkStats.text = "${nf.format(svc.walkSteps)}\nwalk steps\n${svc.formatDist(svc.walkDistM)}"
+        tvJogStats.text  = "${nf.format(svc.jogSteps)}\njog steps\n${svc.formatDist(svc.jogDistM)}"
+        tvRunStats.text  = "${nf.format(svc.runSteps)}\nrun steps\n${svc.formatDist(svc.runDistM)}"
 
         // ── Buttons ───────────────────────────────────────────────────────────
         when {
@@ -605,9 +690,9 @@ class MainActivity : AppCompatActivity() {
                 periods.forEachIndexed { i, p ->
                     val seg = View(this)
                     val color = when (p.type) {
-                        ActivityType.RUNNING -> 0xFFFF5722.toInt()   // coral-orange
-                        ActivityType.JOGGING -> 0xFFFFA000.toInt()   // amber
-                        else                 -> 0xFF14B86A.toInt()   // emerald (walk)
+                        ActivityType.RUNNING -> ContextCompat.getColor(this, R.color.pink_text)
+                        ActivityType.JOGGING -> 0xFFC45A64.toInt()
+                        else                 -> ContextCompat.getColor(this, R.color.peach_text)
                     }
                     seg.setBackgroundColor(color)
                     val weight = p.durationMs.toFloat() / totalMs
@@ -640,6 +725,7 @@ class MainActivity : AppCompatActivity() {
     // ── History UI ────────────────────────────────────────────────────────────
 
     private fun updateHistoryUI() {
+        workoutHistory.backfillCalories(CoachProfile.weightKg(this))
         val records = workoutHistory.loadAll()
         tvHistoryEmpty.visibility = if (records.isEmpty()) View.VISIBLE else View.GONE
         rvHistory.visibility      = if (records.isEmpty()) View.GONE    else View.VISIBLE
@@ -655,10 +741,19 @@ class MainActivity : AppCompatActivity() {
         val totalRunDist  = records.sumOf { it.runDistM }
         val totalWalkMs   = records.sumOf { it.walkDurationMs }
         val totalRunMs    = records.sumOf { it.runDurationMs }
+        val totalKcal     = records.sumOf { it.caloriesKcal }
+        val kcalLine = if (totalKcal > 0) {
+            "\n🔥 ${Format.kcal(totalKcal)} (est.)"
+        } else if (CoachProfile.weightKg(this) == null) {
+            "\n🔥 Add your weight in Botty to estimate calories"
+        } else {
+            ""
+        }
         tvHistorySummary.text =
             "ALL TIME  ·  ${records.size} workouts\n" +
             "🚶 ${formatDist(totalWalkDist)}  ${formatDur(totalWalkMs)}\n" +
-            "🏃 ${formatDist(totalRunDist)}  ${formatDur(totalRunMs)}"
+            "🏃 ${formatDist(totalRunDist)}  ${formatDur(totalRunMs)}" +
+            kcalLine
 
         // Auto-generated insights (#A): pace trend, streak, frequency, PBs.
         val insights = WorkoutInsights.compute(records)
@@ -725,14 +820,26 @@ class MainActivity : AppCompatActivity() {
                     Toast.makeText(this, "Enter valid non-negative numbers", Toast.LENGTH_LONG).show()
                     return@setPositiveButton
                 }
+                val walkMs = (walkMin * 60_000.0).toLong()
+                val runMs = (runMin * 60_000.0).toLong()
+                val walkDist = walkKm * 1000.0
+                val runDist = runKm * 1000.0
+                val kcal = CaloriesCalculator.estimateKcal(
+                    weightKg = CoachProfile.weightKg(this),
+                    walkDurationMs = walkMs,
+                    runDurationMs = runMs,
+                    walkDistM = walkDist,
+                    runDistM = runDist
+                )
                 workoutHistory.save(
                     record.copy(
                         walkSteps = walkSteps,
                         runSteps = runSteps,
-                        walkDistM = walkKm * 1000.0,
-                        runDistM = runKm * 1000.0,
-                        walkDurationMs = (walkMin * 60_000.0).toLong(),
-                        runDurationMs = (runMin * 60_000.0).toLong()
+                        walkDistM = walkDist,
+                        runDistM = runDist,
+                        walkDurationMs = walkMs,
+                        runDurationMs = runMs,
+                        caloriesKcal = kcal
                     )
                 )
                 updateHistoryUI()
@@ -790,7 +897,8 @@ class HistoryAdapter(
         h.tvDate.text  = r.dateLabel
         h.tvWalk.text  = "🚶 ${fDist(r.walkDistM)}  ${fDur(r.walkDurationMs)}  ${r.walkSteps} steps"
         h.tvRun.text   = "🏃 ${fDist(r.runDistM)}  ${fDur(r.runDurationMs)}  ${r.runSteps} steps"
-        h.tvTotal.text = "Total: ${fDist(r.totalDistM)}  ${r.totalSteps} steps"
+        val kcalPart = Format.kcal(r.caloriesKcal).let { if (it.isNotEmpty()) "  ·  $it" else "" }
+        h.tvTotal.text = "Total: ${fDist(r.totalDistM)}  ${fDur(r.totalDurMs)}  ${r.totalSteps} steps$kcalPart"
         h.itemView.setOnClickListener { onEdit(r) }
         h.itemView.setOnLongClickListener { onDelete(r); true }
     }

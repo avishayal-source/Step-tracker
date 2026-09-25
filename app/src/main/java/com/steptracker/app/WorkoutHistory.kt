@@ -33,6 +33,23 @@ class WorkoutHistory(context: Context) {
 
     fun clearAll() = dao.clearAll()
 
+    /**
+     * Fills [WorkoutRecord.caloriesKcal] for rows saved before calories existed
+     * (or without a weight on file). Returns how many rows were updated.
+     */
+    fun backfillCalories(weightKg: Double?): Int {
+        val kg = weightKg ?: return 0
+        var updated = 0
+        for (r in loadAll()) {
+            if (r.caloriesKcal > 0 || r.totalDurMs <= 0L) continue
+            val kcal = CaloriesCalculator.estimateFor(r, kg)
+            if (kcal <= 0) continue
+            save(r.copy(caloriesKcal = kcal))
+            updated++
+        }
+        return updated
+    }
+
     // ── Analytics (new — for insights / NL queries) ─────────────────────────
     /** Average running speed over the last N workouts, in km/h (null if no run data). */
     fun avgRunningSpeedKmh(lastN: Int = 10): Double? =

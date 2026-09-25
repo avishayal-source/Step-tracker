@@ -149,7 +149,7 @@ class StepTrackerService : Service(), StepDetector.StepListener {
             ACTION_RESUME -> resumeTracking()
             ACTION_STOP   -> stopTracking()
         }
-        return START_NOT_STICKY
+        return START_STICKY
     }
 
     override fun onBind(intent: Intent): IBinder = binder
@@ -288,16 +288,28 @@ class StepTrackerService : Service(), StepDetector.StepListener {
         val walkDurMs = activityPeriods.filter { it.type == ActivityType.WALKING }.sumOf { it.durationMs }
         val jogDurMs  = activityPeriods.filter { it.type == ActivityType.JOGGING }.sumOf { it.durationMs }
         val runDurMs  = activityPeriods.filter { it.type == ActivityType.RUNNING }.sumOf { it.durationMs }
-        // History keeps a walk/run split (no DB migration); jogging is part of the
-        // running family, so it folds into the run totals here.
+        // History keeps a walk/run split; jogging is part of the running family,
+        // so it folds into the run totals here.
+        val walkDist = walkDistM
+        val runDist = runDistM + jogDistM
+        val walkMs = walkDurMs
+        val runMs = runDurMs + jogDurMs
+        val kcal = CaloriesCalculator.estimateKcal(
+            weightKg = CoachProfile.weightKg(this),
+            walkDurationMs = walkMs,
+            runDurationMs = runMs,
+            walkDistM = walkDist,
+            runDistM = runDist
+        )
         workoutHistory.save(WorkoutRecord(
             dateMs         = sessionStartMs,
             walkSteps      = walkSteps,
             runSteps       = runSteps + jogSteps,
-            walkDistM      = walkDistM,
-            runDistM       = runDistM + jogDistM,
-            walkDurationMs = walkDurMs,
-            runDurationMs  = runDurMs + jogDurMs
+            walkDistM      = walkDist,
+            runDistM       = runDist,
+            walkDurationMs = walkMs,
+            runDurationMs  = runMs,
+            caloriesKcal   = kcal
         ))
     }
 

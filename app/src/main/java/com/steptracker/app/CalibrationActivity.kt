@@ -179,6 +179,8 @@ class CalibrationActivity : AppCompatActivity(), SensorEventListener {
                 tvInstructions.text =
                     "Tap Start, then $verb in a straight line on flat open ground for about " +
                     "40–50 footfalls (aim for 40–80 m). Tap Stop when done.\n\n" +
+                    "Keep the phone in your pocket (or the same place you carry it on runs). " +
+                    "Holding it in your hand changes how impacts are counted.\n\n" +
                     "The counter shows detected impacts — usually about twice your footfalls " +
                     "(so ~40 footfalls may read near 80). That is expected.\n\n" +
                     "GPS needs ~${MIN_GPS_DIST_M.toInt()} m of good signal. If GPS is weak, " +
@@ -197,10 +199,15 @@ class CalibrationActivity : AppCompatActivity(), SensorEventListener {
                 val distUsed = if (gpsDistanceM >= MIN_GPS_DIST_M) gpsDistanceM else computedStride * stepCount
                 val heightNote = expectedStrideNote()
                 val footfalls = (stepCount / UserPrefs.PEAKS_PER_STRIDE).toInt()
+                val bounds = acceptablePeakLengthRange()
+                val inRange = computedStride in bounds.minOk..bounds.maxOk
+                btnAccept.isEnabled = inRange
+                btnAccept.alpha = if (inRange) 1f else 0.45f
                 tvStride.text =
                     "Measured:  ${"%.3f".format(computedStride)} m per detected step\n" +
                     "Detected impacts:  $stepCount  (~$footfalls footfalls)\n" +
-                    "Distance used:  ${"%.1f".format(distUsed)} m\n\n" +
+                    "Distance used:  ${"%.1f".format(distUsed)} m\n" +
+                    "Acceptable range:  ${"%.2f".format(bounds.minOk)}–${"%.2f".format(bounds.maxOk)} m\n\n" +
                     "Previously saved:  ${"%.3f".format(current)} m/step" +
                     heightNote
             }
@@ -209,21 +216,71 @@ class CalibrationActivity : AppCompatActivity(), SensorEventListener {
 
     private fun expectedStrideNote(): String {
         val h = userPrefs.heightCm
-        if (h < 120f) return ""
+        val bounds = acceptablePeakLengthRange()
+        val ideal = bounds.ideal
+        if (h < 120f) {
+            return "\n\nFor walking, a usable pocket result is usually about " +
+                "${"%.2f".format(bounds.minOk)}–${"%.2f".format(bounds.maxOk)} m per detected impact."
+        }
         val exp = if (calibratingJog)
             UserPrefs.expectedRunStrideM(h) else UserPrefs.expectedWalkStrideM(h)
-        // Compared against the walking stride, not the measurement: the app registers about
-        // two peaks per stride, so a healthy result lands near half the anatomical figure.
-        val ratio = computedStride / exp
-        val flag = when {
-            ratio < 0.35 -> "\n\n⚠ Much shorter than expected for ${h.toInt()} cm " +
-                "(stride ~${"%.2f".format(exp)} m). Retry outdoors on a longer straight path."
-            ratio > 1.35 -> "\n\n⚠ This is longer than typical for ${h.toInt()} cm " +
-                "(~${"%.2f".format(exp)} m). Check GPS / try again."
-            else -> "\n\nYour stride at ${h.toInt()} cm is ~${"%.2f".format(exp)} m; " +
-                "the app measures metres per detected step, so about half that is normal."
+        val ratioToFull = computedStride / exp
+        val ratioToIdeal = if (ideal > 0) computedStride / ideal else 0.0
+        return when {
+            computedStride > bounds.maxOk ->
+                "\n\n⚠ ${"%.2f".format(computedStride)} m is too long for a ${h.toInt()} cm " +
+                    "${if (calibratingJog) "jog" else "walk"}.\n" +
+                    "A full stride is only ~${"%.2f".format(exp)} m; Tracking needs about half of that " +
+                    "per impact (~${"%.2f".format(ideal)} m in a pocket).\n" +
+                    "This usually means missed impacts (hand carry) or noisy GPS — do not save. " +
+                    "Retry with the phone in your pocket on a straight outdoor path."
+            ratioToFull > 0.75 ->
+                "\n\n⚠ Close to a full stride (~${"%.2f".format(exp)} m). That often means the phone " +
+                    "was in your hand and under-counted impacts. Prefer pocket carry " +
+                    "(~${"%.2f".format(ideal)} m)."
+            ratioToIdeal < 0.70 ->
+                "\n\n⚠ Shorter than expected for pocket carry (~${"%.2f".format(ideal)} m). " +
+                    "Retry outdoors on a longer straight path."
+            else ->
+                "\n\nLooks plausible for pocket carry. At ${h.toInt()} cm a full stride is " +
+                    "~${"%.2f".format(exp)} m; ~${"%.2f".format(ideal)} m per impact is the target."
         }
-        return flag
+    }
+
+    /**
+     * Acceptable metres-per-detected-impact. With height, cap just below a full
+     * anatomical stride so values like 0.94 m for a 1.75 m walker are rejected —
+     * that is longer than a real step and cannot be a valid pocket (or hand) walk length.
+     */
+    private data class PeakLengthBounds(val minOk: Double, val maxOk: Double, val ideal: Double)
+
+    private fun acceptablePeakLengthRange(): PeakLengthBounds {
+        val h = userPrefs.heightCm
+        if (calibratingJog) {
+            if (h >= 120f) {
+                val full = UserPrefs.expectedRunStrideM(h)
+                val ideal = full / UserPrefs.PEAKS_PER_STRIDE
+                return PeakLengthBounds(
+                    minOk = (ideal * 0.55).coerceAtLeast(0.30),
+                    // Allow slightly over half-stride; never above a full stride.
+                    maxOk = (ideal * 1.55).coerceAtMost(full * 0.95),
+                    ideal = ideal
+                )
+            }
+            return PeakLengthBounds(0.35, 0.95, 0.60)
+        }
+        if (h >= 120f) {
+            val full = UserPrefs.expectedWalkStrideM(h)
+            val ideal = full / UserPrefs.PEAKS_PER_STRIDE
+            return PeakLengthBounds(
+                minOk = (ideal * 0.55).coerceAtLeast(0.22),
+                // e.g. 1.75 m → full≈0.73, ideal≈0.36, max≈0.56 — rejects 0.94
+                maxOk = (ideal * 1.55).coerceAtMost(full * 0.85),
+                ideal = ideal
+            )
+        }
+        // No height: still reject "almost a metre" walk lengths.
+        return PeakLengthBounds(0.25, 0.65, 0.40)
     }
 
     private fun startCounting() {
@@ -342,18 +399,15 @@ class CalibrationActivity : AppCompatActivity(), SensorEventListener {
 
     private fun acceptResult() {
         if (computedStride <= 0.0) return
-        // These bounds only reject nonsense (a lost GPS fix, a pocketed phone). They are
-        // deliberately not anatomical stride ranges: the counter registers about two peaks
-        // per stride when walking, so a correct result is near half a person's stride, and
-        // rejecting that left users unable to calibrate at all.
-        val minOk = if (calibratingJog) 0.35 else 0.25
-        val maxOk = if (calibratingJog) 2.00 else 1.20
-        if (computedStride < minOk || computedStride > maxOk) {
-            Toast.makeText(this,
-                "Result (${"%.2f".format(computedStride)} m) is outside the usable " +
-                    "${"%.2f".format(minOk)}–${"%.2f".format(maxOk)} m range. " +
-                    "Retry outdoors with a longer straight path.",
-                Toast.LENGTH_LONG).show()
+        val bounds = acceptablePeakLengthRange()
+        if (computedStride < bounds.minOk || computedStride > bounds.maxOk) {
+            Toast.makeText(
+                this,
+                "Cannot save ${"%.2f".format(computedStride)} m — outside " +
+                    "${"%.2f".format(bounds.minOk)}–${"%.2f".format(bounds.maxOk)} m. " +
+                    "Retry with the phone in your pocket.",
+                Toast.LENGTH_LONG
+            ).show()
             return
         }
         if (calibratingJog) {

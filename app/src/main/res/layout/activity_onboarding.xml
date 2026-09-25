@@ -11,7 +11,7 @@
         android:layout_height="0dp"
         android:layout_weight="1"
         android:fillViewport="true"
-        android:padding="22dp">
+        android:padding="28dp">
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -235,10 +235,10 @@
             android:layout_marginStart="8dp"
             android:text="@string/onboarding_agree"
             android:textSize="16sp"
-            android:textColor="@android:color/white"
+            android:textColor="@color/btn_agree_text"
             android:enabled="false"
             app:cornerRadius="26dp"
-            android:backgroundTint="@color/accent" />
+            app:backgroundTint="@color/btn_agree_bg" />
     </LinearLayout>
 
 </LinearLayout>

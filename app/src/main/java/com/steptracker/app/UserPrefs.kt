@@ -64,6 +64,15 @@ class UserPrefs(context: Context) {
         get() = prefs.getBoolean("seen_product_help", false)
         set(v) { prefs.edit().putBoolean("seen_product_help", v).apply() }
 
+    /**
+     * We already offered the "allow unrestricted battery" screen once.
+     * Pixels (and other OEMs) can pause sensors with the screen off unless this
+     * exemption is granted — don't nag every session.
+     */
+    var askedBatteryUnrestricted: Boolean
+        get() = prefs.getBoolean("asked_battery_unrestricted", false)
+        set(v) { prefs.edit().putBoolean("asked_battery_unrestricted", v).apply() }
+
     companion object {
         const val PEAKS_PER_STRIDE = 2.0
         /** Anatomical adult walk / easy-jog stride (metres). */
