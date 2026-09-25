@@ -179,6 +179,8 @@ class CalibrationActivity : AppCompatActivity(), SensorEventListener {
                 tvInstructions.text =
                     "Tap Start, then $verb in a straight line on flat open ground for about " +
                     "40–50 footfalls (aim for 40–80 m). Tap Stop when done.\n\n" +
+                    "Keep the phone in your pocket (or the same place you carry it on runs). " +
+                    "Holding it in your hand changes how impacts are counted.\n\n" +
                     "The counter shows detected impacts — usually about twice your footfalls " +
                     "(so ~40 footfalls may read near 80). That is expected.\n\n" +
                     "GPS needs ~${MIN_GPS_DIST_M.toInt()} m of good signal. If GPS is weak, " +
@@ -218,10 +220,15 @@ class CalibrationActivity : AppCompatActivity(), SensorEventListener {
         val flag = when {
             ratio < 0.35 -> "\n\n⚠ Much shorter than expected for ${h.toInt()} cm " +
                 "(stride ~${"%.2f".format(exp)} m). Retry outdoors on a longer straight path."
-            ratio > 1.35 -> "\n\n⚠ This is longer than typical for ${h.toInt()} cm " +
-                "(~${"%.2f".format(exp)} m). Check GPS / try again."
+            // ~1.0× anatomical stride usually means ~1 impact per footfall (common when
+            // holding the phone). Pocket carry is ~0.5× and matches how Tracking counts.
+            ratio > 0.90 -> "\n\n⚠ ${"%.2f".format(computedStride)} m looks like a full stride " +
+                "(~${"%.2f".format(exp)} m for ${h.toInt()} cm). That often happens when the " +
+                "phone is in your hand. Recalibrate with the phone in your pocket — Tracking " +
+                "expects about half a stride per detected impact."
             else -> "\n\nYour stride at ${h.toInt()} cm is ~${"%.2f".format(exp)} m; " +
-                "the app measures metres per detected step, so about half that is normal."
+                "the app measures metres per detected step, so about half that " +
+                "(~${"%.2f".format(exp / UserPrefs.PEAKS_PER_STRIDE)} m) is normal for pocket carry."
         }
         return flag
     }

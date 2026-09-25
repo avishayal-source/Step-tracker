@@ -10,6 +10,8 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
+import android.os.PowerManager
+import android.provider.Settings
 import android.view.*
 import android.widget.*
 import androidx.activity.result.contract.ActivityResultContracts
@@ -382,6 +384,12 @@ class MainActivity : AppCompatActivity() {
         add(Manifest.permission.ACCESS_COARSE_LOCATION)
     }.toTypedArray()
 
+    private fun hasLocationPerm(): Boolean =
+        ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) ==
+            PackageManager.PERMISSION_GRANTED ||
+            ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) ==
+                PackageManager.PERMISSION_GRANTED
+
     private fun hasTrackingPerms() = (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q)
         listOf(Manifest.permission.ACTIVITY_RECOGNITION) else emptyList())
         .all { ContextCompat.checkSelfPermission(this, it) == PackageManager.PERMISSION_GRANTED }
@@ -401,6 +409,7 @@ class MainActivity : AppCompatActivity() {
                 Toast.makeText(this, "Activity permission required for step tracking",
                     Toast.LENGTH_LONG).show()
             }
+            updateTrackingUI()
         }
     }
 
@@ -419,6 +428,7 @@ class MainActivity : AppCompatActivity() {
                 svc.pauseTracking()
                 updateTrackingUI()
             }
+            // Only prompt when something is still missing — never every Start.
             hasTrackingPerms() -> startTrackingService()
             else -> requestTrackingPermissions()
         }
@@ -502,6 +512,46 @@ class MainActivity : AppCompatActivity() {
         // a duplicate ServiceConnection (which Android reports as a leak).
         stopwatchHandler.removeCallbacks(stopwatchRunnable)
         stopwatchHandler.post(stopwatchRunnable)
+        maybeOfferBatteryUnrestricted()
+        updateTrackingUI()
+    }
+
+    /**
+     * Pixel / OEM battery savers often pause sensors when the screen is off unless the
+     * app is allowed to run unrestricted. Ask once — not on every Start.
+     */
+    private fun maybeOfferBatteryUnrestricted() {
+        if (userPrefs.askedBatteryUnrestricted) return
+        val pm = getSystemService(PowerManager::class.java) ?: return
+        if (pm.isIgnoringBatteryOptimizations(packageName)) {
+            userPrefs.askedBatteryUnrestricted = true
+            return
+        }
+        userPrefs.askedBatteryUnrestricted = true
+        AlertDialog.Builder(this)
+            .setTitle(R.string.battery_unrestricted_title)
+            .setMessage(R.string.battery_unrestricted_message)
+            .setPositiveButton(R.string.battery_unrestricted_allow) { _, _ ->
+                try {
+                    startActivity(
+                        Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS).apply {
+                            data = Uri.parse("package:$packageName")
+                        }
+                    )
+                } catch (_: Exception) {
+                    try {
+                        startActivity(Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS))
+                    } catch (_: Exception) {
+                        Toast.makeText(
+                            this,
+                            R.string.battery_unrestricted_open_settings_fail,
+                            Toast.LENGTH_LONG
+                        ).show()
+                    }
+                }
+            }
+            .setNegativeButton(R.string.battery_unrestricted_not_now, null)
+            .show()
     }
 
     private fun showCaloriesSummary() {
@@ -575,12 +625,11 @@ class MainActivity : AppCompatActivity() {
         }
         tvCurrentActivity.setTextColor(pillTextColor)
 
-        // ── GPS indicator ─────────────────────────────────────────────────────
-        val hasFineLocation = ContextCompat.checkSelfPermission(
-            this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
+        // ── GPS indicator (also when idle, so Location grant is not easy to miss) ─
+        val hasFineLocation = hasLocationPerm()
         tvGpsIndicator.text = when {
-            !svc.isTracking  -> ""
-            !hasFineLocation -> "No GPS"
+            !hasFineLocation -> "Location off — tap Start once to enable GPS distance"
+            !svc.isTracking  -> "Location on"
             svc.gpsAvailable -> "GPS active"
             else             -> "GPS acquiring…"
         }

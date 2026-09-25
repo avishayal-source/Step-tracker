@@ -3,6 +3,16 @@
 All notable changes to Y Walk are documented here. Versions follow the app's
 `versionName` (and `versionCode` in parentheses).
 
+## 1.0.18 (19) — 2026-09-25
+
+Pixel / closed-testing fixes (calibration carry position, GPS visibility, screen-off).
+
+- Calibration: recommend pocket carry; warn when result looks like full-stride (hand)
+- Tracking shows Location status even before Start so GPS grant is harder to miss
+- Ask once for unrestricted battery so sensors keep running with screen off (Pixel)
+- Foreground service restarts more reliably (`START_STICKY`)
+- Permissions still only requested when missing — not on every Start
+
 ## 1.0.17 (18) — 2026-09-24
 
 Calories, Tracking pastel restyle, and closed-testing UI/sensor fixes.

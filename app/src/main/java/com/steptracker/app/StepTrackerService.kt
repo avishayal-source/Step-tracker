@@ -149,7 +149,7 @@ class StepTrackerService : Service(), StepDetector.StepListener {
             ACTION_RESUME -> resumeTracking()
             ACTION_STOP   -> stopTracking()
         }
-        return START_NOT_STICKY
+        return START_STICKY
     }
 
     override fun onBind(intent: Intent): IBinder = binder
