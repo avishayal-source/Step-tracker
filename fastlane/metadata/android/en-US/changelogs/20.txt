@@ -1,0 +1,6 @@
+• Botty adapts: after a break or missed weeks, sessions ease back to what you've run recently
+• Not ready for the goal run? Botty adds an extra build week first
+• Plan workouts stay on the right day across clock changes and travel
+• Brisk walks after a run and treadmill walks no longer count as jogging
+• More accurate distance before calibration; slow-walk calibrations are refused
+• Fixes for unusual Coach inputs, calories and History insights

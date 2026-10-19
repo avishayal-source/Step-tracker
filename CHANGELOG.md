@@ -3,6 +3,24 @@
 All notable changes to Y Walk are documented here. Versions follow the app's
 `versionName` (and `versionCode` in parentheses).
 
+## 1.0.19 (20) — 2026-10-19
+
+QA round: adaptive Botty, DST-safe plan dates, walk classification and calibration fixes.
+
+- Botty shortens a session due now to at most 1.3× (or +0.5 km over) your longest recent
+  run; older runs count less, so a return from injury or a break starts easier
+- Goal run waits for up to 4 extra build weeks when fewer than half the sessions were done
+- "Plan updated" note explains every retired, shortened or added session
+- Goal attempt closes the final week; easy runs stay shorter than the long run
+- Plan dates use calendar days: no workouts a day early after the clocks change or when
+  travelling (existing plans are repaired on load)
+- Brisk cooldown walks after a run return to Walking; treadmill walks no longer read as jogging
+- Uncalibrated stride defaults match measured data (walk 1.5 / jog 1.6 impacts per step)
+- Calibration refuses slow, double-counted walks and asks for your usual pace
+- Coach caps plans at 52 weeks and 100 km and explains the 2-day-a-week minimum
+- Plans with an unknown period type no longer vanish; negative durations add no calories
+- History pace insight ignores impossible runs and only claims a 4-week average when it is one
+
 ## 1.0.18 (19) — 2026-09-25
 
 Pixel / closed-testing fixes (calibration carry position, GPS visibility, screen-off).
