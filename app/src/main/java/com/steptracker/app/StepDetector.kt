@@ -4,6 +4,7 @@ import android.hardware.Sensor
 import android.hardware.SensorEvent
 import android.hardware.SensorEventListener
 import android.util.Log
+import androidx.annotation.VisibleForTesting
 
 /**
  * Walk/run classifier — v13 (trusted-signal run→walk gate)
@@ -222,6 +223,29 @@ class StepDetector(private val listener: StepListener) : SensorEventListener {
     private val gaitSaysWalking: Boolean
         get() = gaitSeparationReady && recentImpact <= walkImpactEwma * GAIT_WALK_RATIO
 
+    // Soft landings release a run even when the walk baseline was never learned (the walk
+    // baseline needs GPS < 1.2 m/s, which a brisk cooldown never reaches). On the 2026-09-22
+    // log walking medians sit near 0.2 × the run baseline and jogging near 0.8, but jogging
+    // still shows low-impact streaks of up to ~15 s, so this needs a sustained streak.
+    private val GAIT_WALK_VS_RUN_RATIO = 0.30
+    /** Absolute walk ceiling when nothing is learned (no GPS yet, e.g. treadmill). Real walking ≈ 2.7. */
+    private val NO_BASELINE_WALK_IMPACT = 5.0
+    private val LOW_IMPACT_WALK_MS = 15_000L
+    private val LOW_IMPACT_WALK_NO_GPS_MS = 30_000L
+    private var lowImpactSinceMs = 0L
+    private var lowImpactStreakMs = 0L
+
+    private val lowImpactNow: Boolean
+        get() = recentImpact > 0.0 && recentImpact <= when {
+            gaitSeparationReady -> walkImpactEwma * GAIT_WALK_RATIO
+            runImpactSeen -> runImpactEwma * GAIT_WALK_VS_RUN_RATIO
+            else -> NO_BASELINE_WALK_IMPACT
+        }
+
+    /** GPS path: only fills the gap the walk baseline leaves; never overrides learned gait. */
+    private val lowImpactSaysWalking: Boolean
+        get() = !walkImpactSeen && runImpactSeen && lowImpactStreakMs >= LOW_IMPACT_WALK_MS
+
     /** Step length implied by GPS speed and detected cadence — null when unusable. */
     val impliedStepM: Double?
         get() {
@@ -260,6 +284,7 @@ class StepDetector(private val listener: StepListener) : SensorEventListener {
         if (slowStreakMs >= SLOW_OVERRIDE_MS) return true
         if (gaitSaysRunning) return false
         if (gaitSaysWalking) return true
+        if (lowImpactSaysWalking) return true
         if (!cadenceTrustworthy) return false
         return !cadenceSaysRunning
     }
@@ -288,7 +313,8 @@ class StepDetector(private val listener: StepListener) : SensorEventListener {
 
     // ── Step handling ─────────────────────────────────────────────────────────
 
-    private fun registerStep(wallMs: Long, intervalMs: Long, peakMag: Float) {
+    @VisibleForTesting
+    internal fun registerStep(wallMs: Long, intervalMs: Long, peakMag: Float) {
         lastPeakMag = peakMag
         if (stepIntervals.size >= INTERVAL_WINDOW) stepIntervals.removeFirst()
         stepIntervals.addLast(intervalMs)
@@ -297,6 +323,13 @@ class StepDetector(private val listener: StepListener) : SensorEventListener {
         if (peakMags.size >= PEAK_WINDOW) peakMags.removeFirst()
         peakMags.addLast(peakMag)
         recentImpact = peakMags.sorted().let { it[it.size / 2] }.toDouble()
+        if (lowImpactNow) {
+            if (lowImpactSinceMs == 0L) lowImpactSinceMs = wallMs
+            lowImpactStreakMs = wallMs - lowImpactSinceMs
+        } else {
+            lowImpactSinceMs = 0L
+            lowImpactStreakMs = 0L
+        }
 
         val spm = currentSpm
         val cadenceVote = if (spm >= CLASSIFY_SPM) ActivityType.RUNNING else ActivityType.WALKING
@@ -356,7 +389,9 @@ class StepDetector(private val listener: StepListener) : SensorEventListener {
                 }
                 classVotes.size >= 5 -> {
                     // No GPS yet: cadence can only tell walk vs running-family → start as jogging.
-                    currentActivity = if (runVoteCount > walkVoteCount)
+                    // Soft landings veto it: a double-counting peak detector makes indoor
+                    // walking read ~200 SPM, and without GPS nothing else can expose that.
+                    currentActivity = if (runVoteCount > walkVoteCount && !lowImpactNow)
                         ActivityType.JOGGING else ActivityType.WALKING
                     stateCandidate = null
                     signalSource = "bootstrap_cadence"
@@ -398,6 +433,8 @@ class StepDetector(private val listener: StepListener) : SensorEventListener {
                         desired == currentActivity -> "stable"
                         isRunningFamily(currentActivity) && slowStreakMs >= SLOW_OVERRIDE_MS ->
                             "dwell_pending_slow_override"
+                        isRunningFamily(currentActivity) && lowImpactSaysWalking ->
+                            "dwell_pending_low_impact"
                         isRunningFamily(currentActivity) && !cadenceTrustworthy ->
                             "dwell_pending_cadence_distrusted"
                         else -> "dwell_pending"
@@ -409,8 +446,11 @@ class StepDetector(private val listener: StepListener) : SensorEventListener {
                 // vs run), so running-family is represented as JOGGING and held as-is.
                 // Require clear walk cadence (not just majority) before leaving a run.
                 desired = when (currentActivity) {
-                    ActivityType.WALKING -> if (runVoteCount >= VOTES_TO_RUN) ActivityType.JOGGING else ActivityType.WALKING
-                    else -> if (walkVoteCount >= VOTES_TO_WALK && !cadenceSaysRunning)
+                    ActivityType.WALKING ->
+                        if (runVoteCount >= VOTES_TO_RUN && !lowImpactNow) ActivityType.JOGGING
+                        else ActivityType.WALKING
+                    else -> if ((walkVoteCount >= VOTES_TO_WALK && !cadenceSaysRunning) ||
+                        lowImpactStreakMs >= LOW_IMPACT_WALK_NO_GPS_MS)
                         ActivityType.WALKING else currentActivity
                 }
                 decisionReason = if (desired == currentActivity) "stable_cadence" else "dwell_pending_cadence"
@@ -535,6 +575,7 @@ class StepDetector(private val listener: StepListener) : SensorEventListener {
         currentActivity = seedActivity
         peaks.reset(); lastPeakMag = 0f
         slowSinceMs = 0L; slowStreakMs = 0L
+        lowImpactSinceMs = 0L; lowImpactStreakMs = 0L
         motionBurstCount = 0; lastCountedWallMs = 0L
         offsetInitialised = false
         stateCandidate = null; switchAccumMs = 0.0

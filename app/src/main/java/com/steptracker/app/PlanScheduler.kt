@@ -15,7 +15,6 @@ import kotlin.math.roundToInt
  */
 object PlanScheduler {
 
-    private const val DAY_MS = 86_400_000L
     private const val REQ_BASE = 80_000   // base AlarmManager request code for reminders
 
     /** Even weekday offsets within a 7-day week for [daysPerWeek] sessions. */
@@ -45,7 +44,7 @@ object PlanScheduler {
             val k = wp.runningDays.coerceAtLeast(1)
             val dayOffsets = offsets.take(k)
             dayOffsets.forEachIndexed { j, off ->
-                val dateMs = startMidnightMs + ((wp.week - 1) * 7 + off) * DAY_MS
+                val dateMs = PlannedWorkout.plusCalendarDays(startMidnightMs, (wp.week - 1) * 7 + off)
                 val isLong = j == 0
                 val distanceKm = if (isLong) wp.longRunKm
                     else max(1.0, min(wp.longRunKm, (wp.weeklyVolumeKm - wp.longRunKm) / max(1, k - 1)))

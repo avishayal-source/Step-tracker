@@ -39,6 +39,8 @@ keystore.properties
 
 # Classifier logs pulled off a device, plus the throwaway scripts used to read them
 device_logs/
+pulled_logs/
+/classifier_debug_*.csv
 
 # Botty eval CSVs (keep the .ps1 harness)
 botty-eval/*.csv

@@ -177,7 +177,6 @@ class WorkoutReminderReceiver : BroadcastReceiver() {
         const val ACTION_REMIND = "com.steptracker.app.ACTION_WORKOUT_REMINDER"
         const val ACTION_DAILY_CHECK = "com.steptracker.app.ACTION_PLAN_DAILY_CHECK"
 
-        private const val DAY_MS = 86_400_000L
         private const val CHECK_HOUR = 18            // 6 PM daily plan check
         private const val WEEKLY_SUMMARY_DAY = Calendar.SUNDAY
 
@@ -245,7 +244,7 @@ class WorkoutReminderReceiver : BroadcastReceiver() {
                 set(Calendar.MINUTE, 0); set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
             }
             if (cal.timeInMillis <= System.currentTimeMillis()) {
-                cal.timeInMillis = cal.timeInMillis + DAY_MS
+                cal.add(Calendar.DAY_OF_YEAR, 1)
             }
             return cal.timeInMillis
         }

@@ -94,7 +94,7 @@ data class PlannedWorkout(
             return PlannedWorkout(
                 id = o.getLong("id"),
                 requestCode = o.getInt("rc"),
-                dateMs = o.getLong("date"),
+                dateMs = nearestLocalMidnight(o.getLong("date")),
                 weekNumber = o.getInt("week"),
                 phase = o.optString("phase", ""),
                 title = o.getString("title"),
@@ -123,6 +123,25 @@ data class PlannedWorkout(
             }
             return cal.timeInMillis / 86_400_000L
         }
+
+        /** [ms] moved by whole calendar days, keeping local time of day (DST days are 23/25 h). */
+        fun plusCalendarDays(ms: Long, days: Int): Long =
+            Calendar.getInstance().apply {
+                timeInMillis = ms
+                add(Calendar.DAY_OF_YEAR, days)
+            }.timeInMillis
+
+        /**
+         * Snaps a stored workout date to the closest local midnight. Repairs dates written by
+         * builds that added 24 h per day (23:00 the evening before, after a DST change) and
+         * dates written in another time zone (within ±12 h).
+         */
+        fun nearestLocalMidnight(ms: Long): Long =
+            Calendar.getInstance().apply {
+                timeInMillis = ms + 43_200_000L
+                set(Calendar.HOUR_OF_DAY, 0); set(Calendar.MINUTE, 0)
+                set(Calendar.SECOND, 0); set(Calendar.MILLISECOND, 0)
+            }.timeInMillis
     }
 }
 
@@ -148,7 +167,7 @@ data class TrainingPlan(
     fun displayWeek(now: Long = System.currentTimeMillis()): Int {
         val start = effectiveStartMs()
         if (now < start) return 1
-        val days = ((now - start) / 86_400_000L).toInt()
+        val days = (PlannedWorkout.dayIndex(now) - PlannedWorkout.dayIndex(start)).toInt()
         return (days / 7 + 1).coerceIn(1, maxProgramWeek)
     }
 
@@ -187,10 +206,11 @@ data class TrainingPlan(
      */
     fun shiftedForward(days: Int): TrainingPlan {
         if (days <= 0) return this
-        val delta = days * 86_400_000L
         return copy(
-            startDateMs = if (startDateMs > 0L) startDateMs + delta else startDateMs,
-            workouts = workouts.map { if (it.pending) it.copy(dateMs = it.dateMs + delta) else it }
+            startDateMs = if (startDateMs > 0L) PlannedWorkout.plusCalendarDays(startDateMs, days) else startDateMs,
+            workouts = workouts.map {
+                if (it.pending) it.copy(dateMs = PlannedWorkout.plusCalendarDays(it.dateMs, days)) else it
+            }
         )
     }
 
@@ -226,7 +246,7 @@ data class TrainingPlan(
                 warmupMin = o.optInt("warmup", 3),
                 cooldownMin = o.optInt("cooldown", 3),
                 workouts = workouts,
-                startDateMs = o.optLong("start", 0L),
+                startDateMs = o.optLong("start", 0L).let { if (it > 0L) PlannedWorkout.nearestLocalMidnight(it) else it },
                 summaryOneLiner = o.optString("summary", ""),
                 milestoneTeaser = o.optString("milestone", ""),
                 totalWeeks = o.optInt("totalWeeks", 0)

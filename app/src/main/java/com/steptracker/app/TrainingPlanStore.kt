@@ -47,8 +47,7 @@ class TrainingPlanStore(context: Context) {
      * one whose day has passed. This is what makes a missed run reachable tomorrow.
      */
     fun nextDueWorkout(plan: TrainingPlan, now: Long = System.currentTimeMillis()): PlannedWorkout? =
-        plan.workouts.filter { it.pending && it.isSameDay(now) }.minByOrNull { it.dateMs }
-            ?: plan.overdueWorkouts(now).firstOrNull()
+        nextDue(plan, now)
 
     /**
      * The next workout to offer *ahead* of its day: earliest pending one falling within
@@ -122,5 +121,11 @@ class TrainingPlanStore(context: Context) {
         val shifted = plan.shiftedForward(days)
         save(shifted)
         return shifted
+    }
+
+    companion object {
+        fun nextDue(plan: TrainingPlan, now: Long): PlannedWorkout? =
+            plan.workouts.filter { it.pending && it.isSameDay(now) }.minByOrNull { it.dateMs }
+                ?: plan.overdueWorkouts(now).firstOrNull()
     }
 }

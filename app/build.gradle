@@ -60,6 +60,11 @@ android {
         viewBinding true
         buildConfig true
     }
+
+    testOptions {
+        // android.util.Log etc. return defaults instead of throwing in JVM tests.
+        unitTests.returnDefaultValues = true
+    }
 }
 
 dependencies {
@@ -85,4 +90,6 @@ dependencies {
     // mismatched package names in :app:handleReleaseMicroApk. Ship Wear separately.
 
     testImplementation 'junit:junit:4.13.2'
+    // Real org.json for JVM tests (android.jar only ships stubs).
+    testImplementation 'org.json:json:20240303'
 }
