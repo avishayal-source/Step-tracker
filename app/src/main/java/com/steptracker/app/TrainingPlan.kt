@@ -84,12 +84,12 @@ data class PlannedWorkout(
     companion object {
         fun fromJson(o: JSONObject): PlannedWorkout {
             val arr = o.getJSONArray("items")
-            val items = (0 until arr.length()).map { i ->
+            // Period types this build doesn't know (newer backup, hand edit) are dropped, not fatal.
+            val items = (0 until arr.length()).mapNotNull { i ->
                 val it = arr.getJSONObject(i)
-                ScheduleItem(
-                    type = ActivityType.valueOf(it.getString("type")),
-                    durationMinutes = it.getInt("mins")
-                )
+                val type = runCatching { ActivityType.valueOf(it.getString("type")) }.getOrNull()
+                    ?: return@mapNotNull null
+                ScheduleItem(type = type, durationMinutes = it.getInt("mins"))
             }
             return PlannedWorkout(
                 id = o.getLong("id"),
@@ -158,7 +158,9 @@ data class TrainingPlan(
     val startDateMs: Long = 0L,
     val summaryOneLiner: String = "",
     val milestoneTeaser: String = "",
-    val totalWeeks: Int = 0
+    val totalWeeks: Int = 0,
+    /** Build weeks [PlanHygiene] inserted before the goal because the user wasn't ready. */
+    val extraWeeks: Int = 0
 ) {
     private val maxProgramWeek: Int
         get() = if (totalWeeks > 0) totalWeeks else workouts.maxOfOrNull { it.weekNumber } ?: 1
@@ -229,6 +231,7 @@ data class TrainingPlan(
         put("summary", summaryOneLiner)
         put("milestone", milestoneTeaser)
         put("totalWeeks", totalWeeks)
+        put("extraWeeks", extraWeeks)
         val arr = JSONArray()
         workouts.forEach { arr.put(it.toJson()) }
         put("workouts", arr)
@@ -249,7 +252,8 @@ data class TrainingPlan(
                 startDateMs = o.optLong("start", 0L).let { if (it > 0L) PlannedWorkout.nearestLocalMidnight(it) else it },
                 summaryOneLiner = o.optString("summary", ""),
                 milestoneTeaser = o.optString("milestone", ""),
-                totalWeeks = o.optInt("totalWeeks", 0)
+                totalWeeks = o.optInt("totalWeeks", 0),
+                extraWeeks = o.optInt("extraWeeks", 0)
             )
         }
     }

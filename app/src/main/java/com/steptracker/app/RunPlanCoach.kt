@@ -35,6 +35,8 @@ object RunPlanCoach {
     private const val BEGINNER_WEEKLY_GROWTH = 0.15
     private const val SAFE_WEEKLY_GROWTH = 0.07
     private const val LONG_RUN_FRACTION = 0.38
+    const val MAX_TARGET_KM = 100.0
+    private const val MAX_HORIZON_WEEKS = 52
 
     /** Fixed walk/run programmes for true beginners. */
     private const val C25K_WEEKS = 9
@@ -107,8 +109,14 @@ object RunPlanCoach {
         if (beginner) cautions.add("You're starting from little or no continuous running, so the plan uses run/walk intervals rather than non-stop running.")
 
         val start = if (beginner) 1.0 else p.currentLongestRunKm
-        val target = g.targetDistanceKm
-        val horizon = g.horizonWeeks.coerceAtLeast(1)
+        val target = g.targetDistanceKm.coerceAtMost(MAX_TARGET_KM)
+        if (g.targetDistanceKm > MAX_TARGET_KM)
+            cautions.add("Botty plans goals up to ${MAX_TARGET_KM.toInt()} km, so this plan aims for ${MAX_TARGET_KM.toInt()} km — check the distance you entered.")
+        val horizon = g.horizonWeeks.coerceIn(1, MAX_HORIZON_WEEKS)
+        if (g.horizonWeeks > MAX_HORIZON_WEEKS)
+            cautions.add("Plans are built up to $MAX_HORIZON_WEEKS weeks at a time; start a new goal when this one is done.")
+        if (p.daysPerWeekAvailable < 2)
+            cautions.add("Building running fitness needs at least 2 days a week, so this plan uses 2 days. Keep them a few days apart.")
         val runDays = p.daysPerWeekAvailable.coerceIn(2, if (highRisk) 4 else 5)
 
         // ── Fixed beginner ladders (not the 10%-rule stretch) ─────────────────

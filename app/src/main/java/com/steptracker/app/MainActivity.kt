@@ -737,23 +737,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         // Totals summary (#8)
-        val totalWalkDist = records.sumOf { it.walkDistM }
-        val totalRunDist  = records.sumOf { it.runDistM }
-        val totalWalkMs   = records.sumOf { it.walkDurationMs }
-        val totalRunMs    = records.sumOf { it.runDurationMs }
-        val totalKcal     = records.sumOf { it.caloriesKcal }
-        val kcalLine = if (totalKcal > 0) {
-            "\n🔥 ${Format.kcal(totalKcal)} (est.)"
-        } else if (CoachProfile.weightKg(this) == null) {
-            "\n🔥 Add your weight in Botty to estimate calories"
-        } else {
-            ""
-        }
-        tvHistorySummary.text =
-            "ALL TIME  ·  ${records.size} workouts\n" +
-            "🚶 ${formatDist(totalWalkDist)}  ${formatDur(totalWalkMs)}\n" +
-            "🏃 ${formatDist(totalRunDist)}  ${formatDur(totalRunMs)}" +
-            kcalLine
+        tvHistorySummary.text = HistorySummary.text(records, CoachProfile.weightKg(this) != null)
 
         // Auto-generated insights (#A): pace trend, streak, frequency, PBs.
         val insights = WorkoutInsights.compute(records)
@@ -859,11 +843,7 @@ class MainActivity : AppCompatActivity() {
         return if (h > 0) "%d:%02d:%02d".format(h, m, s) else "%02d:%02d".format(m, s)
     }
 
-    private fun formatDur(ms: Long): String {
-        val h = TimeUnit.MILLISECONDS.toHours(ms)
-        val m = TimeUnit.MILLISECONDS.toMinutes(ms) % 60
-        return if (h > 0) "${h}h ${m}m" else "${m}m"
-    }
+    private fun formatDur(ms: Long) = Format.durHoursMinutes(ms)
 }
 
 // ── History list adapter ──────────────────────────────────────────────────────
@@ -889,11 +869,7 @@ class HistoryAdapter(
     override fun onBindViewHolder(h: VH, pos: Int) {
         val r = records[pos]
         fun fDist(m: Double) = Format.dist(m)
-        fun fDur(ms: Long): String {
-            val min = TimeUnit.MILLISECONDS.toMinutes(ms)
-            val sec = TimeUnit.MILLISECONDS.toSeconds(ms) % 60
-            return if (min > 0) "${min}m ${sec}s" else "${sec}s"
-        }
+        fun fDur(ms: Long) = Format.durMinutesSeconds(ms)
         h.tvDate.text  = r.dateLabel
         h.tvWalk.text  = "🚶 ${fDist(r.walkDistM)}  ${fDur(r.walkDurationMs)}  ${r.walkSteps} steps"
         h.tvRun.text   = "🏃 ${fDist(r.runDistM)}  ${fDur(r.runDurationMs)}  ${r.runSteps} steps"

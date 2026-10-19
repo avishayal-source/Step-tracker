@@ -40,14 +40,20 @@ object PlanScheduler {
         val workouts = ArrayList<PlannedWorkout>()
         var seq = 0
 
+        val lastWeek = result.plan.maxOfOrNull { it.week } ?: 0
         for (wp in result.plan) {
             val k = wp.runningDays.coerceAtLeast(1)
             val dayOffsets = offsets.take(k)
+            // The goal attempt closes the final week, after its easy days.
+            val longIndex = if (wp.week == lastWeek) dayOffsets.size - 1 else 0
             dayOffsets.forEachIndexed { j, off ->
                 val dateMs = PlannedWorkout.plusCalendarDays(startMidnightMs, (wp.week - 1) * 7 + off)
-                val isLong = j == 0
+                val isLong = j == longIndex
                 val distanceKm = if (isLong) wp.longRunKm
-                    else max(1.0, min(wp.longRunKm, (wp.weeklyVolumeKm - wp.longRunKm) / max(1, k - 1)))
+                    else max(
+                        min(1.0, wp.longRunKm * 0.9),
+                        min(wp.longRunKm * 0.8, (wp.weeklyVolumeKm - wp.longRunKm) / max(1, k - 1))
+                    )
                 val mainMin = max(8, (distanceKm * easyPaceMinPerKm).roundToInt())
 
                 val items = ArrayList<ScheduleItem>()
@@ -89,7 +95,7 @@ object PlanScheduler {
         // Botty often stretches the requested horizon for safety, so the label has to
         // describe the plan that was actually built — not what the user asked for.
         val actualWeeks = (presentation?.totalWeeks ?: result.plan.size).coerceAtLeast(1)
-        val goalLabel = "${fmt(goal.targetDistanceKm)} km in $actualWeeks week${if (actualWeeks == 1) "" else "s"}"
+        val goalLabel = "${fmt(goal.targetDistanceKm.coerceAtMost(RunPlanCoach.MAX_TARGET_KM))} km in $actualWeeks week${if (actualWeeks == 1) "" else "s"}"
         return TrainingPlan(
             createdMs = System.currentTimeMillis(),
             goalLabel = goalLabel,

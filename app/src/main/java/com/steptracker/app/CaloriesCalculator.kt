@@ -32,8 +32,9 @@ object CaloriesCalculator {
         val kg = weightKg?.takeIf { it in 25.0..300.0 } ?: return 0
         if (walkDurationMs <= 0L && runDurationMs <= 0L) return 0
 
-        val walkHours = walkDurationMs / 3_600_000.0
-        val runHours = runDurationMs / 3_600_000.0
+        // A clock change mid-workout can leave one side negative; it must not cancel the other.
+        val walkHours = walkDurationMs.coerceAtLeast(0L) / 3_600_000.0
+        val runHours = runDurationMs.coerceAtLeast(0L) / 3_600_000.0
         val walkMet = metForWalk(walkDistM, walkDurationMs)
         val runMet = metForRun(runDistM, runDurationMs)
         val kcal = walkMet * kg * walkHours + runMet * kg * runHours

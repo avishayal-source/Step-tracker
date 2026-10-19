@@ -9,6 +9,9 @@ JVM tests live where Gradle expects them:
 | Extreme-case unit tests | `app/src/test/.../qa/*ExtremeCases*`, `CalendarAndDstTest`, `PlanPersistenceRobustnessTest` | `.\qa\run-qa.ps1` |
 | Classifier scenarios (synthetic gait + GPS) | `ClassifierScenarioTest` | `.\qa\run-qa.ps1 -Only Classifier` |
 | Virtual users on a virtual calendar | `VirtualUsersTimelineTest` → `app/build/qa-reports/virtual_users.txt` | `.\qa\run-qa.ps1 -Only VirtualUsers` |
+| Calibration wizard | `CalibrationTest` | `.\qa\run-qa.ps1 -Only Calibration` |
+| Botty with occasional / injured users | `BottyAdherenceTest` → `app/build/qa-reports/botty_adherence.txt` | `.\qa\run-qa.ps1 -Only BottyAdherence` |
+| History tab | `HistoryTabTest` | `.\qa\run-qa.ps1 -Only HistoryTab` |
 | Device robustness (adb) | `qa/device/robustness.ps1` → `qa/device/out/<timestamp>/` | `.\qa\device\robustness.ps1 -Suite Monkey` |
 | Manual "random user" checklist | `qa/RANDOM_USER_CHECKLIST.md` | by hand, per release |
 
@@ -57,6 +60,24 @@ insights and checks: backlog ≤ 2, nothing offered past grace, retirements alwa
 explained, `nextDue` never returns done/future work, kcal plausible, plan always
 terminates, done + retired = total.
 
+**CalibrationTest** — the wizard's maths (`CalibrationMath`): minimum impacts/distance,
+height-based acceptance bounds for 120–230 cm, the v1.0.18 "0.94 m rejected at 175 cm"
+regression. A synthetic accelerometer (heel strike + mid-stance bump) is fed through the
+real `StepPeakDetector` to calibrate and then track: same gait, pocket vs hand carry,
+easy vs brisk pace, slow walk (two impacts per step below ~107 steps/min because of the
+280 ms gap) vs normal walk. Also checks the uncalibrated defaults and the wizard bounds
+against the real 2026-09-22 log (skipped when `pulled_logs/` is absent).
+
+**BottyAdherenceTest** — a real Botty plan lived day by day by: an occasional user
+(one random session a week on a 3-a-week 5K plan, 5 seeds) and an injured 10K user
+(5-day and 3-week breaks, passive return vs "Shift plan to today"). Checks backlog,
+retirement messages, that something is offered on training days, load jumps versus
+what the user actually did recently, and the first session/week after the break.
+
+**HistoryTabTest** — the ALL TIME summary (`HistorySummary`), duration formatting, and
+the insights lines for daily, occasional, walk-only and returning-from-injury histories:
+streak rules, 7/30-day boundaries, pace-trend thresholds, personal best.
+
 ## Findings (first run, v1.0.17, 19 Oct 2026)
 
 **Fixed** (tests now green): #1, #2, #3, #8, #12. Plan dates use calendar-day arithmetic
@@ -66,6 +87,11 @@ soft-landing streak when the walk baseline was never learned, and soft landings 
 "jogging" when there is no GPS. `ClassifierReplayTest` replays the recorded workouts in
 `device_logs/` and `pulled_logs/` (not committed) — the 2026-09-22 workout is unchanged
 at 99.9 % agreement.
+
+**Fixed in round 2:** #4–#7, #9–#11. Unknown period types are dropped on load; the coach
+caps the horizon at 52 weeks and the target at 100 km (with a caution) and explains the
+2-day minimum; easy runs are ≤ 80 % of the long run and the goal attempt closes the final
+week; negative durations add no calories; History ignores runs outside 1–7 m/s.
 
 | # | Severity | Finding | Test |
 |---|---|---|---|
@@ -84,6 +110,33 @@ at 99.9 % agreement.
 | 13 | Design | After finishing today's workout the next overdue one is offered the same day — the "Stacker" persona did double sessions on 9 days, contradicting PlanHygiene's anti-stacking intent. | virtual users report (`stacked`) |
 | 14 | Design | Habitual "shift plan to today" with 55 % adherence stretched a 12-week plan to 31 weeks with no upper bound or warning. | virtual users report (`realign`, `days`) |
 | 15 | Info | Standing at a traffic light: the GPS Kalman filter takes ~10 s to fall below walking speed, so phone fidgets in that window are counted as steps. | `trafficLightStop_countsNoStepsAndKeepsTheRun` (tolerated ≤ 8) |
+
+### Second round (calibration, occasional/injured users, History)
+
+**Fixed:** #16–#20, #22. `PlanHygiene` now (a) shortens a session due today/tomorrow to at
+most 1.3× (or +0.5 km over) the longest recent completed session, with sessions older than
+14 days counting for less, so a return from injury starts easier; (b) inserts an extra
+build week before the goal run while fewer than half the sessions are done (up to 4);
+Botty's "Plan updated" note lists every change. Uncalibrated defaults use the measured
+1.5 (walk) / 1.6 (jog) peaks per step. The wizard refuses a walk length below
+step ÷ 1.6 (a slow, double-counted walk) and says to walk at the usual pace. The pace line
+says "your earlier runs" when there is no 4-week baseline. #18 and #19 tests were
+reworded to the new rules (`occasionalUser_goalRunWaitsForExtraBuildWeeks`,
+`slowWalkCalibration_isRefusedOrStaysAccurate`).
+
+| # | Severity | Finding | Test |
+|---|---|---|---|
+| 16 | **High** | After 3 weeks injured, a user who just opens the app again (doesn't tap "Shift plan") gets **Week 7 · Long run 4.8 km** as the first session — best before the injury was 3.6 km. No deload or "welcome back" plan after a break. Tapping "Shift plan" correctly rewinds to week 4. | `defect_afterInjury_resumesNoHarderThanBefore` |
+| 17 | **High** | Occasional user (1 session/week on a 3-a-week plan): the plan follows the calendar, not what was done — 7 sessions across 5 seeds were > 30 % longer than anything done in the previous 3 weeks (e.g. 2.1 km after a best of 1.2 km). | `defect_occasionalUser_isNeverHandedABigLoadJump` |
+| 18 | Medium | Same user is offered the goal run after completing 9 of 26 sessions, with no readiness warning. | `defect_occasionalUser_isNotSentToTheGoalRunUnprepared` |
+| 19 | Medium | Calibrating during a slow walk (< ~107 steps/min, the detector counts two impacts per step) then walking normally tracks 1000 m as **560 m** (and the reverse ~doubles). Matters whenever GPS is absent. | `defect_calibratedAtSlowWalk_trackedAtNormalWalk_staysAccurate` |
+| 20 | Medium | Uncalibrated defaults assume 2 impacts per stride; the real log shows ~1.3 (walk) / ~1 (jog), so defaults are 20–27 % short (walk 0.38 vs 0.52 m, jog 0.60 vs 0.75 m per impact). | `defect_uncalibratedDefaults_matchRealImpactLengths` |
+| 21 | Medium | History keeps only the latest 365 sessions (`trimToMostRecent(365)`); older ones are deleted silently and "ALL TIME" totals shrink. Not unit-testable without Robolectric — see checklist. | — |
+| 22 | Low | Back from a break with no runs in the previous 28 days, the pace line compares against older runs but still says "4-week average". | `defect_paceInsight_onlyClaimsFourWeekAverageWhenItIsOne` |
+
+Verified OK: hand-carry calibration (~2× length per impact) is rejected; easy-pace
+calibration used for brisk walking stays within 10 %; after a long break PlanHygiene
+explains retired sessions and "Shift plan" is still offered; backlog never exceeds 2.
 
 Not unit-testable from here (handled by the checklist / device script): foreground
 service survival under OEM battery killers, permission UX, accessibility, install/upgrade.

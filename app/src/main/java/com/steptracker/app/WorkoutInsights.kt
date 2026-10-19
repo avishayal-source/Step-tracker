@@ -15,6 +15,9 @@ object WorkoutInsights {
 
     private val DAY_MS = TimeUnit.DAYS.toMillis(1)
 
+    /** ~16:40 min/km shuffle to ~2:20 min/km sprint; anything outside is a data error. */
+    private val PLAUSIBLE_RUN_MPS = 1.0..7.0
+
     /**
      * Builds an ordered list of short, emoji-prefixed insight lines.
      * [records] is expected newest-first (as [WorkoutHistory.loadAll] returns),
@@ -47,7 +50,11 @@ object WorkoutInsights {
 
     // ── Running pace vs 4-week average ───────────────────────────────────────
     private fun paceTrendLine(records: List<WorkoutRecord>): String? {
-        val runs = records.filter { it.runDurationMs > 0 && it.runDistM > 0 }
+        // Hand-edited or glitched sessions (e.g. 5 km in 0.01 min) would dominate the comparison.
+        val runs = records.filter {
+            it.runDurationMs > 0 && it.runDistM > 0 &&
+                speedMps(it.runDistM, it.runDurationMs)!! in PLAUSIBLE_RUN_MPS
+        }
         if (runs.size < 2) return null
 
         val latest = runs.first()
@@ -56,6 +63,7 @@ object WorkoutInsights {
         // Baseline: other runs within 28 days before the latest; fall back to all prior runs.
         val windowStart = latest.dateMs - 28 * DAY_MS
         var baseline = runs.drop(1).filter { it.dateMs >= windowStart }
+        val reference = if (baseline.isEmpty()) "your earlier runs" else "your 4-week average"
         if (baseline.isEmpty()) baseline = runs.drop(1)
         if (baseline.isEmpty()) return null
 
@@ -66,9 +74,9 @@ object WorkoutInsights {
 
         val pct = ((latestSpeed - baseSpeed) / baseSpeed) * 100.0
         return when {
-            pct >= 3 -> "🏃 You ran ${pct.toInt()}% faster than your 4-week average — nice!"
-            pct <= -3 -> "🏃 Your last run was ${(-pct).toInt()}% slower than your 4-week average."
-            else -> "🏃 Your running pace is right on your 4-week average."
+            pct >= 3 -> "🏃 You ran ${pct.toInt()}% faster than $reference — nice!"
+            pct <= -3 -> "🏃 Your last run was ${(-pct).toInt()}% slower than $reference."
+            else -> "🏃 Your running pace is right on $reference."
         }
     }
 

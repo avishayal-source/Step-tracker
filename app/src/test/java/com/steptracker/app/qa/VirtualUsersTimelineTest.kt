@@ -52,8 +52,10 @@ class VirtualUsersTimelineTest {
 
     data class Report(
         val persona: Persona,
-        val totalWorkouts: Int,
+        var totalWorkouts: Int,
         var done: Int = 0,
+        var eased: Int = 0,
+        var extraWeeks: Int = 0,
         var skippedByHygiene: Int = 0,
         var maxBacklog: Int = 0,
         var stackedDays: Int = 0,
@@ -150,8 +152,10 @@ class VirtualUsersTimelineTest {
             val rec = PlanHygiene.reconcile(plan, now)
             plan = rec.plan
             r.skippedByHygiene += rec.retired.size
-            if (rec.changed && PlanHygiene.retiredMessage(rec.retired).isNullOrBlank())
-                r.violations += "day $day: retired workouts without a message"
+            if (rec.changed && PlanHygiene.changeMessage(rec).isNullOrBlank())
+                r.violations += "day $day: plan changed without a message"
+            r.eased += rec.eased.size
+            if (rec.addedBuildWeek) r.extraWeeks++
 
             val overdue = plan.overdueWorkouts(now)
             r.maxBacklog = maxOf(r.maxBacklog, overdue.size)
@@ -201,6 +205,7 @@ class VirtualUsersTimelineTest {
         r.pendingAtEnd = plan.workouts.count { it.pending }
         r.history = history.size
         if (r.pendingAtEnd > 0) r.violations += "plan still has ${r.pendingAtEnd} pending workouts after $maxDays days (zombie plan)"
+        r.totalWorkouts = plan.workouts.size
         if (r.pendingAtEnd == 0 && r.done + r.skippedByHygiene != r.totalWorkouts)
             r.violations += "accounting: done ${r.done} + retired ${r.skippedByHygiene} ≠ ${r.totalWorkouts}"
         return r
@@ -233,14 +238,16 @@ class VirtualUsersTimelineTest {
         val sb = StringBuilder()
         sb.appendLine("Y Walk — virtual users timeline report")
         sb.appendLine("=".repeat(118))
-        sb.appendLine("%-34s %5s %5s %7s %6s %7s %7s %7s %8s %6s %6s".format(
-            "persona", "plan", "done", "retired", "maxBL", "stacked", "realign", "offMid", "kcal", "days", "viol"))
+        sb.appendLine("%-34s %5s %5s %7s %6s %7s %7s %7s %5s %5s %8s %6s %6s".format(
+            "persona", "plan", "done", "retired", "maxBL", "stacked", "realign", "offMid", "eased", "+wks", "kcal", "days", "viol"))
         for (r in reports) {
-            sb.appendLine("%-34s %5d %5d %7d %6d %7d %7d %7d %8d %6d %6d".format(
+            sb.appendLine("%-34s %5d %5d %7d %6d %7d %7d %7d %5d %5d %8d %6d %6d".format(
                 r.persona.name.take(34), r.totalWorkouts, r.done, r.skippedByHygiene, r.maxBacklog,
-                r.stackedDays, r.realignments, r.offMidnightWorkouts, r.totalKcal, r.simulatedDays, r.violations.size))
+                r.stackedDays, r.realignments, r.offMidnightWorkouts, r.eased, r.extraWeeks,
+                r.totalKcal, r.simulatedDays, r.violations.size))
         }
         sb.appendLine()
+        sb.appendLine("eased = sessions Botty shortened to recent capacity; +wks = build weeks added before the goal.")
         sb.appendLine("offMid = workouts whose stored date is not local midnight (DST arithmetic defect).")
         sb.appendLine("stacked = days the user completed more than one session (catch-up stacking).")
         for (r in reports.filter { it.violations.isNotEmpty() }) {

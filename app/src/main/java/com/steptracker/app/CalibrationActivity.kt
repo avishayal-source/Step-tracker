@@ -62,9 +62,8 @@ class CalibrationActivity : AppCompatActivity(), SensorEventListener {
     private var gpsDistanceM = 0.0
     private var lastLocation: Location? = null
     private var computedStride = 0.0
-    /** Detected peaks (tracker units). UI also shows ~footfalls ≈ peaks/2. */
-    private val MIN_STEPS = 40
-    private val MIN_GPS_DIST_M = 20.0
+    private val MIN_STEPS = CalibrationMath.MIN_STEPS
+    private val MIN_GPS_DIST_M = CalibrationMath.MIN_GPS_DIST_M
 
     private val locationListener = object : LocationListener {
         override fun onLocationChanged(loc: Location) {
@@ -198,7 +197,7 @@ class CalibrationActivity : AppCompatActivity(), SensorEventListener {
                 val current = if (calibratingJog) userPrefs.runStrideM else userPrefs.walkStrideM
                 val distUsed = if (gpsDistanceM >= MIN_GPS_DIST_M) gpsDistanceM else computedStride * stepCount
                 val heightNote = expectedStrideNote()
-                val footfalls = (stepCount / UserPrefs.PEAKS_PER_STRIDE).toInt()
+                val footfalls = (stepCount / UserPrefs.peaksPerStep(calibratingJog)).toInt()
                 val bounds = acceptablePeakLengthRange()
                 val inRange = computedStride in bounds.minOk..bounds.maxOk
                 btnAccept.isEnabled = inRange
@@ -230,10 +229,14 @@ class CalibrationActivity : AppCompatActivity(), SensorEventListener {
             computedStride > bounds.maxOk ->
                 "\n\n⚠ ${"%.2f".format(computedStride)} m is too long for a ${h.toInt()} cm " +
                     "${if (calibratingJog) "jog" else "walk"}.\n" +
-                    "A full stride is only ~${"%.2f".format(exp)} m; Tracking needs about half of that " +
+                    "A full stride is only ~${"%.2f".format(exp)} m; tracking needs less than that " +
                     "per impact (~${"%.2f".format(ideal)} m in a pocket).\n" +
                     "This usually means missed impacts (hand carry) or noisy GPS — do not save. " +
                     "Retry with the phone in your pocket on a straight outdoor path."
+            !calibratingJog && computedStride < bounds.minOk ->
+                "\n\n⚠ That looks like a slow walk: the phone counted about two impacts per step, " +
+                    "so saving it would make every normal-pace walk read far too short. " +
+                    "Retry walking at your usual pace."
             ratioToFull > 0.75 ->
                 "\n\n⚠ Close to a full stride (~${"%.2f".format(exp)} m). That often means the phone " +
                     "was in your hand and under-counted impacts. Prefer pocket carry " +
@@ -247,41 +250,8 @@ class CalibrationActivity : AppCompatActivity(), SensorEventListener {
         }
     }
 
-    /**
-     * Acceptable metres-per-detected-impact. With height, cap just below a full
-     * anatomical stride so values like 0.94 m for a 1.75 m walker are rejected —
-     * that is longer than a real step and cannot be a valid pocket (or hand) walk length.
-     */
-    private data class PeakLengthBounds(val minOk: Double, val maxOk: Double, val ideal: Double)
-
-    private fun acceptablePeakLengthRange(): PeakLengthBounds {
-        val h = userPrefs.heightCm
-        if (calibratingJog) {
-            if (h >= 120f) {
-                val full = UserPrefs.expectedRunStrideM(h)
-                val ideal = full / UserPrefs.PEAKS_PER_STRIDE
-                return PeakLengthBounds(
-                    minOk = (ideal * 0.55).coerceAtLeast(0.30),
-                    // Allow slightly over half-stride; never above a full stride.
-                    maxOk = (ideal * 1.55).coerceAtMost(full * 0.95),
-                    ideal = ideal
-                )
-            }
-            return PeakLengthBounds(0.35, 0.95, 0.60)
-        }
-        if (h >= 120f) {
-            val full = UserPrefs.expectedWalkStrideM(h)
-            val ideal = full / UserPrefs.PEAKS_PER_STRIDE
-            return PeakLengthBounds(
-                minOk = (ideal * 0.55).coerceAtLeast(0.22),
-                // e.g. 1.75 m → full≈0.73, ideal≈0.36, max≈0.56 — rejects 0.94
-                maxOk = (ideal * 1.55).coerceAtMost(full * 0.85),
-                ideal = ideal
-            )
-        }
-        // No height: still reject "almost a metre" walk lengths.
-        return PeakLengthBounds(0.25, 0.65, 0.40)
-    }
+    private fun acceptablePeakLengthRange(): CalibrationMath.Bounds =
+        CalibrationMath.bounds(userPrefs.heightCm, calibratingJog)
 
     private fun startCounting() {
         counting = false
@@ -359,8 +329,9 @@ class CalibrationActivity : AppCompatActivity(), SensorEventListener {
             return
         }
 
-        if (finalDist >= MIN_GPS_DIST_M) {
-            computedStride = finalDist / finalSteps
+        val fromGps = CalibrationMath.strideFromGps(finalSteps, finalDist)
+        if (fromGps != null) {
+            computedStride = fromGps
             showPhase(Phase.RESULT)
         } else {
             askManualDistance(finalSteps, finalDist)
@@ -381,13 +352,13 @@ class CalibrationActivity : AppCompatActivity(), SensorEventListener {
                 "GPS only recorded ${"%.1f".format(finalDist)} m " +
                     "(need ≥${MIN_GPS_DIST_M.toInt()} m outdoors).\n\n" +
                     "How many metres did you $verb?\nDetected impacts: $finalSteps " +
-                    "(~${(finalSteps / UserPrefs.PEAKS_PER_STRIDE).toInt()} footfalls)"
+                    "(~${(finalSteps / UserPrefs.peaksPerStep(calibratingJog)).toInt()} footfalls)"
             )
             .setView(et)
             .setPositiveButton("Calculate") { _, _ ->
-                val dist = et.text.toString().toDoubleOrNull()
-                if (dist != null && dist >= 15.0) {
-                    computedStride = dist / finalSteps
+                val fromManual = CalibrationMath.strideFromManual(finalSteps, et.text.toString().toDoubleOrNull())
+                if (fromManual != null) {
+                    computedStride = fromManual
                     showPhase(Phase.RESULT)
                 } else {
                     Toast.makeText(this, "Enter at least 15 metres for a usable average",
@@ -436,7 +407,7 @@ class CalibrationActivity : AppCompatActivity(), SensorEventListener {
     }
 
     private fun updateCountingUI() {
-        val footfalls = (stepCount / UserPrefs.PEAKS_PER_STRIDE).toInt()
+        val footfalls = (stepCount / UserPrefs.peaksPerStep(calibratingJog)).toInt()
         tvStepCount.text = "$stepCount impacts (~$footfalls footfalls)"
         tvDistance.text  = if (gpsDistanceM >= 0.5)
             "${"%.1f".format(gpsDistanceM)} m (GPS)"

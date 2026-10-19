@@ -58,15 +58,7 @@ class TrainingPlanStore(context: Context) {
         plan: TrainingPlan,
         now: Long = System.currentTimeMillis(),
         maxDaysAhead: Int
-    ): PlannedWorkout? {
-        val candidate = plan.pendingWorkouts().firstOrNull { w ->
-            val daysUntil = -w.daysLate(now)
-            daysUntil in 1..maxDaysAhead
-        } ?: return null
-        val daysUntil = -candidate.daysLate(now)
-        if (daysUntil > 1 && isPreviewDismissed(candidate.id)) return null
-        return candidate
-    }
+    ): PlannedWorkout? = preview(plan, now, maxDaysAhead, ::isPreviewDismissed)
 
     /** Remembers that the user replaced a preloaded workout, so it isn't pushed at them again. */
     fun dismissPreview(workoutId: Long) {
@@ -127,5 +119,20 @@ class TrainingPlanStore(context: Context) {
         fun nextDue(plan: TrainingPlan, now: Long): PlannedWorkout? =
             plan.workouts.filter { it.pending && it.isSameDay(now) }.minByOrNull { it.dateMs }
                 ?: plan.overdueWorkouts(now).firstOrNull()
+
+        fun preview(
+            plan: TrainingPlan,
+            now: Long,
+            maxDaysAhead: Int,
+            isDismissed: (Long) -> Boolean = { false }
+        ): PlannedWorkout? {
+            val candidate = plan.pendingWorkouts().firstOrNull { w ->
+                val daysUntil = -w.daysLate(now)
+                daysUntil in 1..maxDaysAhead
+            } ?: return null
+            val daysUntil = -candidate.daysLate(now)
+            if (daysUntil > 1 && isDismissed(candidate.id)) return null
+            return candidate
+        }
     }
 }

@@ -5,8 +5,8 @@ import android.content.Context
 class UserPrefs(context: Context) {
     private val prefs = context.getSharedPreferences("user_prefs", Context.MODE_PRIVATE)
 
-    // Metres per *detected peak*. The counter registers ~two peaks per anatomical
-    // stride, so uncalibrated defaults are half of a typical adult stride.
+    // Metres per *detected peak*. The counter registers more than one peak per anatomical
+    // step (see WALK_PEAKS_PER_STEP / RUN_PEAKS_PER_STEP), so defaults are shorter than a step.
     var walkStrideM: Double
         get() = prefs.getFloat("walk_stride", DEFAULT_WALK_STRIDE_M.toFloat()).toDouble()
         set(v) { prefs.edit().putFloat("walk_stride", v.toFloat()).apply() }
@@ -74,13 +74,20 @@ class UserPrefs(context: Context) {
         set(v) { prefs.edit().putBoolean("asked_battery_unrestricted", v).apply() }
 
     companion object {
-        const val PEAKS_PER_STRIDE = 2.0
+        /**
+         * Detected peaks per anatomical step, measured on recorded workouts: walking adds a
+         * mid-stance peak on most steps (it only clears the 280 ms gap below ~107 steps/min),
+         * jogging mostly doesn't.
+         */
+        const val WALK_PEAKS_PER_STEP = 1.5
+        const val RUN_PEAKS_PER_STEP = 1.6
+        fun peaksPerStep(jog: Boolean): Double = if (jog) RUN_PEAKS_PER_STEP else WALK_PEAKS_PER_STEP
         /** Anatomical adult walk / easy-jog stride (metres). */
         const val ANATOMICAL_WALK_STRIDE_M = 0.78
         const val ANATOMICAL_RUN_STRIDE_M = 1.20
         /** Uncalibrated defaults: metres per detected peak. */
-        val DEFAULT_WALK_STRIDE_M = ANATOMICAL_WALK_STRIDE_M / PEAKS_PER_STRIDE
-        val DEFAULT_RUN_STRIDE_M = ANATOMICAL_RUN_STRIDE_M / PEAKS_PER_STRIDE
+        val DEFAULT_WALK_STRIDE_M = ANATOMICAL_WALK_STRIDE_M / WALK_PEAKS_PER_STEP
+        val DEFAULT_RUN_STRIDE_M = ANATOMICAL_RUN_STRIDE_M / RUN_PEAKS_PER_STEP
 
         /** Typical walk stride ≈ 41.5% of height. */
         fun expectedWalkStrideM(heightCm: Float): Double =
@@ -92,11 +99,11 @@ class UserPrefs(context: Context) {
 
         fun peakWalkStrideM(heightCm: Float = 0f): Double =
             (if (heightCm >= 120f) expectedWalkStrideM(heightCm) else ANATOMICAL_WALK_STRIDE_M) /
-                PEAKS_PER_STRIDE
+                WALK_PEAKS_PER_STEP
 
         fun peakRunStrideM(heightCm: Float = 0f): Double =
             (if (heightCm >= 120f) expectedRunStrideM(heightCm) else ANATOMICAL_RUN_STRIDE_M) /
-                PEAKS_PER_STRIDE
+                RUN_PEAKS_PER_STEP
     }
 
     /** Replace leftover anatomical defaults only for gaits that were never calibrated. */

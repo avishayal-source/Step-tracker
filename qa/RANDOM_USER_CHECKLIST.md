@@ -64,10 +64,12 @@ tagged **[auto]**.
 - [ ] Low storage (< 200 MB) → saving a workout doesn't silently fail.
 - [ ] Edit a past workout with extreme values (0, 99999, 0.01 min) — see known defect #11.
 - [ ] Delete workout / delete plan are confirmable and undoable or clearly final.
+- [ ] Import a backup with > 365 workouts: are the oldest dropped, and do ALL TIME totals change? (finding #21)
 
 ## 8. Botty / plans from a newcomer's point of view
 - [ ] Typo inputs (500 weeks, 1000 km, 1 day/week) — see known defects #6, #7, #9.
 - [ ] Missing a week of workouts: the user understands what Botty did (retired vs shifted).
+- [ ] Back after 3 weeks off without tapping "Shift plan": first session isn't harder than before the break (finding #16).
 - [ ] Doing two workouts in one day is discouraged — see design finding #13.
 - [ ] Plan label, week counter and Schedule tab agree on the same week.
 

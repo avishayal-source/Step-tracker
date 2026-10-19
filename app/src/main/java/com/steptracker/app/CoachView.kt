@@ -230,9 +230,9 @@ class CoachView(
         if (plan != null && plan.workouts.isNotEmpty()) {
             showActivePlan(plan)
             if (announceRetired && reconciled.changed) {
-                PlanHygiene.retiredMessage(reconciled.retired)?.let { msg ->
+                PlanHygiene.changeMessage(reconciled)?.let { msg ->
                     AlertDialog.Builder(activity)
-                        .setTitle("Plan tidied up")
+                        .setTitle("Plan updated")
                         .setMessage(msg)
                         .setPositiveButton("Got it", null)
                         .show()
