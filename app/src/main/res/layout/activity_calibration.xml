@@ -17,8 +17,11 @@
 
         <ImageButton
             android:id="@+id/btnCalibBack"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:padding="8dp"
+            android:scaleType="fitCenter"
+            android:contentDescription="@string/cd_close_calibration"
             android:src="@android:drawable/ic_menu_close_clear_cancel"
             android:background="?attr/selectableItemBackgroundBorderless"
             android:tint="@color/text_secondary" />

@@ -167,8 +167,8 @@ object BackupManager {
             if (up.has("walk_stride")) userPrefs.walkStrideM = up.getDouble("walk_stride")
             if (up.has("run_stride")) userPrefs.runStrideM = up.getDouble("run_stride")
             if (up.has("walk_calibrated")) userPrefs.walkCalibrated = up.getBoolean("walk_calibrated")
+            else if (up.has("calibrated")) userPrefs.walkCalibrated = up.getBoolean("calibrated")
             if (up.has("run_calibrated")) userPrefs.runCalibrated = up.getBoolean("run_calibrated")
-            else if (up.has("calibrated")) userPrefs.isCalibrated = up.getBoolean("calibrated")
             if (up.has("height_cm")) userPrefs.heightCm = up.getDouble("height_cm").toFloat()
         }
 

@@ -4,9 +4,10 @@ import android.content.Context
 import android.os.CountDownTimer
 
 class ScheduleManager(
-    private val context: Context,
-    private val listener: Listener
+    context: Context,
+    var listener: Listener
 ) {
+    private val context: Context = context.applicationContext
 
     interface Listener {
         fun onTick(periodIndex: Int, remainingMs: Long)
@@ -32,20 +33,34 @@ class ScheduleManager(
     var pausedRemainingMs = 0L
         private set
 
+    /** True during the 3-2-1 countdown, before the first period exists. */
+    var isPreparing = false
+        private set
+    /** When the countdown ends and the first period starts (wall clock). */
+    var prepEndsAtMs = 0L
+        private set
+    var prepItems: List<ScheduleItem> = emptyList()
+        private set
+
     /** Begin 3-2-1 countdown, then run the schedule. */
     fun startWithPrep(schedule: List<ScheduleItem>) {
         prepTimer?.cancel()
         isPaused = false
         pausedRemainingMs = 0L
-        prepTimer = object : CountDownTimer(3000L, 1000L) {
+        isPreparing = true
+        prepItems = schedule
+        prepEndsAtMs = System.currentTimeMillis() + PREP_MS
+        prepTimer = object : CountDownTimer(PREP_MS, 1000L) {
             override fun onTick(remaining: Long) {
                 val secs = ((remaining + 999) / 1000).toInt().coerceIn(1, 3)
                 playSound(SoundType.COUNTDOWN)
                 listener.onPrepCountdown(secs)
             }
             override fun onFinish() {
-                listener.onPrepFinished()
+                isPreparing = false
+                prepTimer = null
                 start(schedule)
+                listener.onPrepFinished()
             }
         }.start()
     }
@@ -80,21 +95,17 @@ class ScheduleManager(
         }
 
         isPaused = false
-        var index = snapshot.currentIndex.coerceIn(0, items.lastIndex)
-        var elapsedInPeriod = System.currentTimeMillis() - snapshot.periodStartMs
-
-        while (index < items.size) {
-            val dur = items[index].durationMs
-            if (elapsedInPeriod < dur) {
-                startPeriod(index, (dur - elapsedInPeriod).coerceAtLeast(500L))
-                return
-            }
-            items[index] = items[index].copy(
-                state = ScheduleState.DONE,
-                actualEndTime = System.currentTimeMillis()
-            )
-            elapsedInPeriod -= dur
-            index++
+        val index = snapshot.currentIndex.coerceIn(0, items.lastIndex)
+        val now = System.currentTimeMillis()
+        val pos = ScheduleTiming.positionAfter(
+            items.map { it.durationMs }, index, now - snapshot.periodStartMs)
+        val firstUnfinished = pos?.index ?: items.size
+        for (i in index until firstUnfinished) {
+            items[i] = items[i].copy(state = ScheduleState.DONE, actualEndTime = now)
+        }
+        if (pos != null) {
+            startPeriod(pos.index, pos.remainingMs.coerceAtLeast(500L))
+            return
         }
 
         isRunning = false
@@ -126,6 +137,7 @@ class ScheduleManager(
         timer?.cancel(); timer = null
         isRunning = false
         isPaused = false
+        isPreparing = false
         pausedRemainingMs = 0L
         if (currentIndex < items.size)
             items[currentIndex] = items[currentIndex].copy(state = ScheduleState.PENDING)
@@ -135,15 +147,14 @@ class ScheduleManager(
 
     fun editPeriodDuration(index: Int, newMinutes: Int) {
         if (index < 0 || index >= items.size) return
+        val oldMs = items[index].durationMs
         items[index] = items[index].copy(durationMinutes = newMinutes)
+        val remaining = ScheduleTiming.remainingAfterEdit(oldMs, pausedRemainingMs, items[index].durationMs)
         if (index == currentIndex && isRunning && !isPaused) {
-            val elapsed = items[index].actualStartTime.let {
-                if (it > 0) System.currentTimeMillis() - it else 0L }
-            val remaining = (newMinutes * 60_000L - elapsed).coerceAtLeast(5000L)
             timer?.cancel()
-            startPeriod(currentIndex, remaining)
+            startPeriod(currentIndex, remaining, restartClock = false)
         } else if (index == currentIndex && isPaused) {
-            pausedRemainingMs = (newMinutes * 60_000L).coerceAtLeast(5000L)
+            pausedRemainingMs = remaining
             listener.onTick(currentIndex, pausedRemainingMs)
         }
         listener.onScheduleEdited()
@@ -205,6 +216,10 @@ class ScheduleManager(
     }
 
     enum class SoundType { COUNTDOWN, TO_WALK, TO_RUN, COMPLETE }
+
+    companion object {
+        const val PREP_MS = 3000L
+    }
 
     fun playSound(type: SoundType) {
         if (!UserPrefs(context).soundCuesEnabled) return

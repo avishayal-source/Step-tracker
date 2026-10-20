@@ -33,4 +33,15 @@ data class ActivityPeriod(
 
     val usingGps: Boolean
         get() = gpsEngaged
+
+    /**
+     * Call at the GPS fix that becomes the distance anchor. Deltas measured from that
+     * anchor are added on top, so the step baseline must be taken here and not at the
+     * first delta, or the stretch between the two fixes is counted twice.
+     */
+    fun engageGps() {
+        if (gpsEngaged) return
+        stepDistanceAtGpsStartM = stepDistanceM
+        gpsEngaged = true
+    }
 }

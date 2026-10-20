@@ -75,31 +75,39 @@ class WorkoutHistory(context: Context) {
     // ── One-time migration from the old SharedPreferences JSON ───────────────
     private fun migrateLegacyJsonIfNeeded() {
         val json = legacyPrefs.getString(LEGACY_KEY, null) ?: return
-        try {
-            val arr = JSONArray(json)
-            for (i in 0 until arr.length()) {
-                dao.insert(fromLegacyJson(arr.getJSONObject(i)))
-            }
-        } catch (_: Exception) {
-            // Corrupt legacy data — drop it rather than crash.
-        } finally {
-            // Remove the legacy blob so migration runs exactly once.
-            legacyPrefs.edit().remove(LEGACY_KEY).apply()
+        val records = parseLegacy(json)
+        for (r in records) {
+            try { dao.insert(r) } catch (_: Exception) {}
         }
+        legacyPrefs.edit().apply {
+            // Unreadable as a whole: keep a copy instead of silently losing it.
+            if (records.isEmpty() && json.isNotBlank() && json != "[]") putString(LEGACY_CORRUPT_KEY, json)
+            // Remove the legacy blob so migration runs exactly once.
+            remove(LEGACY_KEY)
+        }.apply()
     }
-
-    private fun fromLegacyJson(o: JSONObject) = WorkoutRecord(
-        id             = o.optLong("id", System.currentTimeMillis()),
-        dateMs         = o.getLong("date"),
-        walkSteps      = o.getInt("wSteps"),
-        runSteps       = o.getInt("rSteps"),
-        walkDistM      = o.getDouble("wDist"),
-        runDistM       = o.getDouble("rDist"),
-        walkDurationMs = o.getLong("wDur"),
-        runDurationMs  = o.getLong("rDur")
-    )
 
     companion object {
         private const val LEGACY_KEY = "records"
+        private const val LEGACY_CORRUPT_KEY = "records_corrupt"
+
+        /** Legacy records that can be read; one bad entry doesn't take the rest with it. */
+        fun parseLegacy(json: String): List<WorkoutRecord> {
+            val arr = try { JSONArray(json) } catch (_: Exception) { return emptyList() }
+            return (0 until arr.length()).mapNotNull { i ->
+                try { legacyRecordOf(arr.getJSONObject(i)) } catch (_: Exception) { null }
+            }
+        }
+
+        private fun legacyRecordOf(o: JSONObject) = WorkoutRecord(
+            id             = o.optLong("id", System.currentTimeMillis()),
+            dateMs         = o.getLong("date"),
+            walkSteps      = o.getInt("wSteps"),
+            runSteps       = o.getInt("rSteps"),
+            walkDistM      = o.getDouble("wDist"),
+            runDistM       = o.getDouble("rDist"),
+            walkDurationMs = o.getLong("wDur"),
+            runDurationMs  = o.getLong("rDur")
+        )
     }
 }

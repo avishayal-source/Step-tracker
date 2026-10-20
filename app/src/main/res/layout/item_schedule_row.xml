@@ -29,8 +29,11 @@
     <!-- Minus -->
     <ImageButton
         android:id="@+id/btnMinus"
-        android:layout_width="32dp"
-        android:layout_height="32dp"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:padding="12dp"
+        android:scaleType="fitCenter"
+        android:contentDescription="@string/cd_period_shorter"
         android:src="@drawable/ic_minus"
         android:background="?attr/selectableItemBackgroundBorderless"
         android:tint="@color/text_secondary" />
@@ -48,8 +51,11 @@
     <!-- Plus -->
     <ImageButton
         android:id="@+id/btnPlus"
-        android:layout_width="32dp"
-        android:layout_height="32dp"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        android:padding="12dp"
+        android:scaleType="fitCenter"
+        android:contentDescription="@string/cd_period_longer"
         android:src="@drawable/ic_plus"
         android:background="?attr/selectableItemBackgroundBorderless"
         android:tint="@color/text_secondary" />

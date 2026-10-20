@@ -140,3 +140,27 @@ explains retired sessions and "Shift plan" is still offered; backlog never excee
 
 Not unit-testable from here (handled by the checklist / device script): foreground
 service survival under OEM battery killers, permission UX, accessibility, install/upgrade.
+
+### Third round (external deep-research report, ST ids)
+
+The report reviewed the old public `main` (v1.0, targetSdk 34). ST-01, ST-06, ST-20 and the
+History half of ST-15 were already fixed on the release branch. Confirmed items, all fixed;
+pure logic is pinned in `QaReportRegressionTest`, lifecycle items need the device checklist.
+
+| ST | Finding | Fix | Test |
+|---|---|---|---|
+| 02 | Schedule tab started the foreground service with no permission check (Android 14+ crash); the service swallowed foreground failures. | Shared `TrackingPermissions`; Schedule asks first and offers "Timer only"; service rolls back and tells the user if it can't enter the foreground. | checklist |
+| 03 | Recreating the Activity mid-run started a second timer next to the first. | One `ScheduleManager` per process (`ScheduleRuntime`); the new screen re-attaches. | checklist |
+| 04 | Live edits measured elapsed time since the last edit/resume, not the period start. | Elapsed comes from the countdown (`ScheduleTiming.remainingAfterEdit`); same for paused edits; saved start ignores pauses. | `st04_*` |
+| 05 | GPS step baseline taken at the 2nd fix — the stretch between fixes 1 and 2 counted twice. | Baseline at the anchor fix (`ActivityPeriod.engageGps`); a bounced fix no longer becomes the anchor. | `st05_*` |
+| 07 | Stop left an ongoing (unswipeable) "Stopped" notification. | `STOP_FOREGROUND_REMOVE`. | checklist |
+| 08 | Snapshot saved during the 3-2-1 countdown stored start = 0, so a restore completed the run at once. | Countdown saves the first period's real start; negative elapsed clamps to 0. | `st08_*` |
+| 09 | Every 250 ms tick rebound the whole list and rewrote SharedPreferences. | Rebind only when the active row moves; snapshot every 5 s. | — |
+| 10 | Legacy single `calibrated` flag marked the jog gait calibrated too. | Legacy flag counts for walking only (prefs and backup restore). | — |
+| 11 | Calibration treated "approximate location" as denied by reading `results[0]`. | Checks granted state; explains that GPS needs precise location. | checklist |
+| 12 | Calibration GPS had no speed filter and accepted network fixes. | GPS provider only, bounce filter (> 8 m/s) like the tracker. | `st12_*` |
+| 13 | "52,5" rejected in distance/height/weight fields. | `Format.parseDecimal` everywhere users type decimals. | `st13_*` |
+| 14 | Calibration close (40 dp) and schedule ± (32 dp) below 48 dp, no labels. | 48 dp targets, content descriptions. | checklist |
+| 15 | One corrupt saved schedule hid all of them, and the next save/delete erased them. Legacy History migration stopped at the first bad record. | Per-entry parsing; save/delete edit the raw array; corrupt root is backed up. Migration skips only bad records. | `st15_*` |
+| 16 | Step times used a continuously re-smoothed wall-clock offset, so clock changes bent step gaps. | `SensorClock` settles over 100 samples, then freezes. | `st16_*` |
+| 17 | Wake lock had a fixed 4 h timeout, never renewed, and was held while paused. | 2 h timeout renewed hourly while tracking; released on pause. | checklist |

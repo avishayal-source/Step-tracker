@@ -58,6 +58,9 @@
     <string name="permission_rationale_message">Y Walk needs:\n\n• Activity recognition — to count steps and detect walking vs running.\n\n• Location (optional) — to measure distance more accurately while you track. Denying location still allows step-based tracking.\n\n• Notifications (optional) — for workout reminders if you use a training plan.\n\nYour workout data stays on this device and is not sent to our servers.\n\nYou will only see this when a permission is still missing — not every time you press Start.</string>
     <string name="permission_rationale_continue">Continue</string>
     <string name="permission_rationale_cancel">Not now</string>
+    <string name="cd_close_calibration">Close calibration</string>
+    <string name="cd_period_shorter">One minute shorter</string>
+    <string name="cd_period_longer">One minute longer</string>
 
     <string name="battery_unrestricted_title">Keep tracking with screen off</string>
     <string name="battery_unrestricted_message">On Pixel and some other phones, battery saving can pause sensors when the screen is off.\n\nAllow Y Walk to run unrestricted so walks and runs keep counting in the background. You can change this later in system settings.</string>

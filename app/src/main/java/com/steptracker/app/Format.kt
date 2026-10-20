@@ -24,6 +24,16 @@ object Format {
         val sec = TimeUnit.MILLISECONDS.toSeconds(ms) % 60
         return if (min > 0) "${min}m ${sec}s" else "${sec}s"
     }
+
+    /**
+     * Parses a number typed by the user. Many keyboards and locales use a decimal comma
+     * ("1,5"), which [String.toDoubleOrNull] rejects.
+     */
+    fun parseDecimal(text: String?): Double? {
+        val s = text?.trim()?.replace(',', '.') ?: return null
+        if (s.isEmpty()) return null
+        return s.toDoubleOrNull()?.takeIf { it.isFinite() }
+    }
 }
 
 /** The all-time block at the top of the History tab. */

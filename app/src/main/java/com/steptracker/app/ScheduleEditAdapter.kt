@@ -14,7 +14,12 @@ class ScheduleEditAdapter(
     private var activeIndex = -1
 
     fun setRunningMode(v: Boolean) { runningMode = v }
-    fun setActiveIndex(i: Int) { activeIndex = i; notifyDataSetChanged() }
+    /** Called on every timer tick; only rebinds when the active row actually moves. */
+    fun setActiveIndex(i: Int) {
+        if (i == activeIndex) return
+        activeIndex = i
+        notifyDataSetChanged()
+    }
 
     inner class VH(v: View) : RecyclerView.ViewHolder(v) {
         val tvLabel: TextView     = v.findViewById(R.id.tvRowLabel)

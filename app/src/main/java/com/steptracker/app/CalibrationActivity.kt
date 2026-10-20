@@ -68,10 +68,16 @@ class CalibrationActivity : AppCompatActivity(), SensorEventListener {
     private val locationListener = object : LocationListener {
         override fun onLocationChanged(loc: Location) {
             if (!counting) return
+            // Same rules as tracking: hardware GPS only, good accuracy, no bounces.
+            if (loc.provider != LocationManager.GPS_PROVIDER) return
             if (loc.hasAccuracy() && loc.accuracy > 15f) return
-            lastLocation?.let { prev ->
+            val prev = lastLocation
+            if (prev != null) {
                 val delta = prev.distanceTo(loc).toDouble()
-                if (delta in 0.5..40.0) {
+                val dtSec = (loc.time - prev.time) / 1000.0
+                // A bounced fix is dropped without becoming the next anchor.
+                if (CalibrationMath.isGpsBounce(delta, dtSec)) return
+                if (CalibrationMath.countsAsGpsDistance(delta)) {
                     gpsDistanceM += delta
                     runOnUiThread { updateCountingUI() }
                 }
@@ -131,7 +137,7 @@ class CalibrationActivity : AppCompatActivity(), SensorEventListener {
 
     /** Height is optional but strongly recommended; empty is allowed with a toast. */
     private fun saveHeightOrWarn(): Boolean {
-        val h = etHeight.text.toString().toFloatOrNull()
+        val h = Format.parseDecimal(etHeight.text.toString())?.toFloat()
         if (h != null) {
             if (h !in 120f..230f) {
                 Toast.makeText(this, "Enter a height between 120 and 230 cm", Toast.LENGTH_LONG).show()
@@ -264,9 +270,7 @@ class CalibrationActivity : AppCompatActivity(), SensorEventListener {
         sensorManager.registerListener(this, accel, SensorManager.SENSOR_DELAY_GAME)
         counting = true
 
-        val hasFine = ActivityCompat.checkSelfPermission(this,
-            Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
-        if (!hasFine) {
+        if (!hasFineLocation()) {
             ActivityCompat.requestPermissions(this,
                 arrayOf(Manifest.permission.ACCESS_FINE_LOCATION,
                         Manifest.permission.ACCESS_COARSE_LOCATION), 200)
@@ -278,35 +282,33 @@ class CalibrationActivity : AppCompatActivity(), SensorEventListener {
 
     private fun startGpsUpdates() {
         val lm = locationManager ?: return
-        try {
-            val providers = lm.getProviders(true)
-            var started = false
-            val ordered = providers.sortedByDescending {
-                when (it) {
-                    LocationManager.GPS_PROVIDER     -> 2
-                    LocationManager.NETWORK_PROVIDER -> 1
-                    else                             -> 0
-                }
+        // Network fixes are far too coarse to measure a 20 m stretch, so only GPS is used.
+        tvGpsStatus.text = try {
+            if (lm.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
+                lm.requestLocationUpdates(LocationManager.GPS_PROVIDER, 500L, 0.5f,
+                    locationListener, Looper.getMainLooper())
+                "📍 GPS acquiring fix…"
+            } else {
+                "⚠ GPS is off — use a known distance"
             }
-            for (provider in ordered) {
-                try {
-                    lm.requestLocationUpdates(provider, 500L, 0.5f,
-                        locationListener, Looper.getMainLooper())
-                    started = true
-                    break
-                } catch (_: Exception) {}
-            }
-            tvGpsStatus.text = if (started) "📍 GPS acquiring fix…" else "⚠ No location provider — use known distance"
         } catch (_: Exception) {
-            tvGpsStatus.text = "⚠ Could not start GPS"
+            "⚠ Could not start GPS"
         }
     }
+
+    private fun hasFineLocation() = ActivityCompat.checkSelfPermission(this,
+        Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED
 
     override fun onRequestPermissionsResult(rc: Int, perms: Array<out String>, results: IntArray) {
         super.onRequestPermissionsResult(rc, perms, results)
         if (rc == 200) {
-            if (results.isNotEmpty() && results[0] == PackageManager.PERMISSION_GRANTED) startGpsUpdates()
-            else tvGpsStatus.text = "⚠ GPS denied — use a known distance"
+            // Judge by what is granted now, not by the order of the result array.
+            tvGpsStatus.text = when {
+                hasFineLocation() -> { startGpsUpdates(); tvGpsStatus.text }
+                TrackingPermissions.hasLocation(this) ->
+                    "⚠ Approximate location only — GPS needs precise location. Use a known distance"
+                else -> "⚠ GPS denied — use a known distance"
+            }
         }
     }
 
@@ -356,7 +358,7 @@ class CalibrationActivity : AppCompatActivity(), SensorEventListener {
             )
             .setView(et)
             .setPositiveButton("Calculate") { _, _ ->
-                val fromManual = CalibrationMath.strideFromManual(finalSteps, et.text.toString().toDoubleOrNull())
+                val fromManual = CalibrationMath.strideFromManual(finalSteps, Format.parseDecimal(et.text.toString()))
                 if (fromManual != null) {
                     computedStride = fromManual
                     showPhase(Phase.RESULT)

@@ -20,6 +20,12 @@ tagged **[auto]**.
 - [ ] Notifications denied (Android 13+) → foreground service still starts; reminders explain they're off.
 - [ ] Exact alarms denied (Android 14) → workout reminders degrade gracefully.
 - [ ] Permission revoked from Settings *during* a workout → no crash, workout saved.
+- [ ] Schedule tab, Physical activity never granted, tap Start → rationale dialog; "Timer only" runs the timer without crashing (Android 14+).
+- [ ] Rotate / switch dark mode mid-schedule → one countdown, cues not doubled; finishing still marks the plan workout done.
+- [ ] Kill the app during the 3-2-1 countdown, reopen → schedule starts at period 1 in full, not "complete".
+- [ ] Stop a workout → no leftover tracking notification.
+- [ ] Calibration with "approximate location" → message says GPS needs precise location.
+- [ ] TalkBack: calibration close and schedule ± buttons are announced.
 
 ## 3. Staying alive during a workout (the core promise)  **[auto partly]**
 - [ ] 60-min workout, screen off, phone in pocket: tracking never stops (Samsung "sleeping apps", Xiaomi autostart, Doze).

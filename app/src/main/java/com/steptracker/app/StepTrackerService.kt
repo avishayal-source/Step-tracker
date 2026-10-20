@@ -10,6 +10,7 @@ import android.hardware.Sensor
 import android.hardware.SensorManager
 import android.location.*
 import android.os.*
+import android.widget.Toast
 import androidx.core.app.ActivityCompat
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
@@ -29,6 +30,8 @@ class StepTrackerService : Service(), StepDetector.StepListener {
         const val ACTION_PAUSE         = "PAUSE"
         const val ACTION_RESUME        = "RESUME"
         const val EXTRA_INITIAL_TYPE   = "initial_type"
+        private const val WAKE_LOCK_TIMEOUT_MS = 2 * 60 * 60 * 1000L
+        private const val WAKE_LOCK_RENEW_MS   = 60 * 60 * 1000L
     }
 
     inner class LocalBinder : Binder() { fun getService() = this@StepTrackerService }
@@ -59,16 +62,21 @@ class StepTrackerService : Service(), StepDetector.StepListener {
             gpsAvailable = true
 
             val prev = lastGpsLocation
-            lastGpsLocation = loc
-
-            if (prev == null) return   // need a reference point before measuring a delta
+            if (prev == null) {
+                // First trusted fix is the anchor: the period's step baseline is taken now.
+                lastGpsLocation = loc
+                currentPeriod?.engageGps()
+                return
+            }
 
             val delta        = prev.distanceTo(loc).toDouble()
             val timeDeltaSec = ((loc.time - prev.time) / 1000.0).coerceAtLeast(0.001)
             val impliedSpeed = delta / timeDeltaSec   // m/s
 
-            // Sanity: reject fixes that imply > 29 km/h (GPS bounce / multipath)
+            // Sanity: reject fixes that imply > 29 km/h (GPS bounce / multipath).
+            // Keep the previous anchor so a single bounced fix can't become the reference.
             if (impliedSpeed > 8.0) return
+            lastGpsLocation = loc
             if (delta < 0.5 || delta > 200.0) return
 
             // Feed speed into the classifier. Prefer the hardware speed from the fix
@@ -76,13 +84,8 @@ class StepTrackerService : Service(), StepDetector.StepListener {
             val speedForClassifier = if (loc.hasSpeed()) loc.speed.toDouble() else impliedSpeed
             stepDetector.updateGpsSpeed(speedForClassifier, loc.time)
 
-            // Capture each period's baseline the first time it receives a GPS delta.
-            // This works across activity switches (a new period gets its own baseline).
             currentPeriod?.let { p ->
-                if (!p.gpsEngaged) {
-                    p.stepDistanceAtGpsStartM = p.stepDistanceM
-                    p.gpsEngaged = true
-                }
+                p.engageGps()
                 p.gpsDistanceM += delta
             }
             recomputeTotals()
@@ -133,7 +136,30 @@ class StepTrackerService : Service(), StepDetector.StepListener {
         // PARTIAL_WAKE_LOCK keeps the CPU running for sensor delivery without forcing
         // the screen on (SCREEN_DIM_WAKE_LOCK was deprecated and wasted battery).
         wakeLock = pm.newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "letsgo:tracking")
+        wakeLock.setReferenceCounted(false)
         createNotificationChannel()
+    }
+
+    // The wake lock carries a timeout so a crash can't pin the CPU forever; while
+    // tracking it is renewed well before that timeout so long sessions keep sensors alive.
+    private val wakeHandler = Handler(Looper.getMainLooper())
+    private val renewWakeLock = object : Runnable {
+        override fun run() {
+            if (!isTracking || isPaused) return
+            wakeLock.acquire(WAKE_LOCK_TIMEOUT_MS)
+            wakeHandler.postDelayed(this, WAKE_LOCK_RENEW_MS)
+        }
+    }
+
+    private fun holdWakeLock() {
+        wakeHandler.removeCallbacks(renewWakeLock)
+        wakeLock.acquire(WAKE_LOCK_TIMEOUT_MS)
+        wakeHandler.postDelayed(renewWakeLock, WAKE_LOCK_RENEW_MS)
+    }
+
+    private fun dropWakeLock() {
+        wakeHandler.removeCallbacks(renewWakeLock)
+        if (wakeLock.isHeld) wakeLock.release()
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -155,6 +181,7 @@ class StepTrackerService : Service(), StepDetector.StepListener {
     override fun onBind(intent: Intent): IBinder = binder
 
     override fun onDestroy() {
+        dropWakeLock()
         closeClassifierDebugLog()
         super.onDestroy()
     }
@@ -179,9 +206,24 @@ class StepTrackerService : Service(), StepDetector.StepListener {
             sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER),
             SensorManager.SENSOR_DELAY_GAME)
         startGps()
-        if (!wakeLock.isHeld) wakeLock.acquire(4 * 60 * 60 * 1000L)
+        holdWakeLock()
         openNewPeriod(seed, System.currentTimeMillis())
-        startInForeground(buildNotification("Tracking…"))
+        if (!startInForeground(buildNotification("Tracking…"))) abortStart()
+    }
+
+    /** Foreground start was refused (permission revoked mid-flight): undo, and say so. */
+    private fun abortStart() {
+        isTracking = false
+        isPaused = false
+        sensorManager.unregisterListener(stepDetector)
+        stopGps()
+        dropWakeLock()
+        closeClassifierDebugLog()
+        activityPeriods.clear(); currentPeriod = null
+        onUpdateListener?.invoke()
+        Toast.makeText(this, "Couldn't start step tracking — check the app's permissions",
+            Toast.LENGTH_LONG).show()
+        stopSelf()
     }
 
     /** Freeze sensors/GPS; keep session totals for Resume. */
@@ -191,6 +233,7 @@ class StepTrackerService : Service(), StepDetector.StepListener {
         isPaused = true
         sensorManager.unregisterListener(stepDetector)
         stopGps()
+        dropWakeLock()
         updateNotification("Paused – $totalSteps steps")
         onUpdateListener?.invoke()
     }
@@ -203,7 +246,7 @@ class StepTrackerService : Service(), StepDetector.StepListener {
             sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER),
             SensorManager.SENSOR_DELAY_GAME)
         startGps()
-        if (!wakeLock.isHeld) wakeLock.acquire(4 * 60 * 60 * 1000L)
+        holdWakeLock()
         updateNotification("Tracking…")
         onUpdateListener?.invoke()
     }
@@ -223,7 +266,7 @@ class StepTrackerService : Service(), StepDetector.StepListener {
         isPaused = false
         sensorManager.unregisterListener(stepDetector)
         stopGps()
-        if (wakeLock.isHeld) wakeLock.release()
+        dropWakeLock()
         val now = System.currentTimeMillis()
         currentPeriod?.let {
             it.endTime = now
@@ -235,10 +278,10 @@ class StepTrackerService : Service(), StepDetector.StepListener {
             historySaved = true
             saveWorkoutToHistory()
         }
-        updateNotification("Stopped – $totalSteps steps · ${formatDist(walkDistM + jogDistM + runDistM)}")
         onUpdateListener?.invoke()
         closeClassifierDebugLog()
-        stopForeground(STOP_FOREGROUND_DETACH)
+        // The tracking notification is ongoing (not swipeable), so it must go with the service.
+        stopForeground(STOP_FOREGROUND_REMOVE)
     }
 
     fun resetData() {
@@ -256,29 +299,16 @@ class StepTrackerService : Service(), StepDetector.StepListener {
      * `location` type while ACCESS_*_LOCATION is denied throws SecurityException and
      * crashes the app. We therefore build the type bitmask from granted permissions.
      */
-    private fun startInForeground(notification: Notification) {
-        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
-            startForeground(NOTIFICATION_ID, notification)
-            return
-        }
-        var type = 0
-        val hasLocation =
-            ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) == PackageManager.PERMISSION_GRANTED ||
-            ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) == PackageManager.PERMISSION_GRANTED
-        if (hasLocation) type = type or ServiceInfo.FOREGROUND_SERVICE_TYPE_LOCATION
-
-        // HEALTH type exists from API 34 and requires ACTIVITY_RECOGNITION (or BODY_SENSORS)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-            val hasActivity = ContextCompat.checkSelfPermission(
-                this, Manifest.permission.ACTIVITY_RECOGNITION) == PackageManager.PERMISSION_GRANTED
-            if (hasActivity) type = type or ServiceInfo.FOREGROUND_SERVICE_TYPE_HEALTH
-        }
-
-        try {
-            if (type != 0) startForeground(NOTIFICATION_ID, notification, type)
-            else startForeground(NOTIFICATION_ID, notification)
-        } catch (e: Exception) {
-            try { startForeground(NOTIFICATION_ID, notification) } catch (_: Exception) {}
+    private fun startInForeground(notification: Notification): Boolean {
+        return try {
+            val type = TrackingPermissions.foregroundTypes(this)
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && type != 0)
+                startForeground(NOTIFICATION_ID, notification, type)
+            else
+                startForeground(NOTIFICATION_ID, notification)
+            true
+        } catch (_: Exception) {
+            false
         }
     }
 
@@ -523,6 +553,8 @@ class StepTrackerService : Service(), StepDetector.StepListener {
             startTime  = startMs,
             walkStride = userPrefs.walkStrideM,
             runStride  = userPrefs.runStrideM)
+        // GPS already anchored: the new period is measured by GPS from its first metre.
+        if (lastGpsLocation != null) period.engageGps()
         activityPeriods.add(period); currentPeriod = period
     }
 

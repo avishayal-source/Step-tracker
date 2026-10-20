@@ -6,6 +6,7 @@ import android.view.View
 import android.widget.*
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.ItemTouchHelper
 import androidx.recyclerview.widget.LinearLayoutManager
@@ -58,17 +59,25 @@ class ScheduleEmbeddedView(
 
     // Id of the planned workout currently loaded in the editor. Tracking the id (rather
     // than just "is it today's") means an overdue session loaded days late still gets
-    // marked done against the right entry in the plan.
-    private var loadedPlanWorkoutId: Long? = null
+    // marked done against the right entry in the plan. Kept in ScheduleRuntime so a
+    // recreated screen finishing the same run still knows which workout it was.
+    private var loadedPlanWorkoutId: Long?
+        get() = ScheduleRuntime.planWorkoutId
+        set(v) { ScheduleRuntime.planWorkoutId = v }
 
     // Set when the loaded workout was pulled in ahead of its scheduled day.
-    private var loadedAheadOfSchedule = false
+    private var loadedAheadOfSchedule: Boolean
+        get() = ScheduleRuntime.aheadOfSchedule
+        set(v) { ScheduleRuntime.aheadOfSchedule = v }
 
     private lateinit var voice: VoiceCoach
-    private val spokenMarkers = mutableSetOf<Int>()
+    private val spokenMarkers get() = ScheduleRuntime.spokenMarkers
+    private var lastPersistMs = 0L
 
     fun setup() {
-        scheduleManager = ScheduleManager(activity, this)
+        scheduleManager = ScheduleRuntime.manager
+            ?: ScheduleManager(activity, this).also { ScheduleRuntime.manager = it }
+        scheduleManager.listener = this
         voice = VoiceCoach(activity)
         store = ScheduleStore(activity)
         runPersistence = ScheduleRunPersistence(activity)
@@ -144,8 +153,41 @@ class ScheduleEmbeddedView(
         activity.bindService(Intent(activity, StepTrackerService::class.java), serviceConn, Context.BIND_AUTO_CREATE)
         layoutRunning.visibility = View.GONE
         refreshTotals()
+        if (scheduleManager.isRunning || scheduleManager.isPreparing) {
+            // Same process, timer still live: attach to it. Restoring the snapshot here
+            // would start a second timer alongside the first.
+            pendingRestore = false
+            adoptLiveRun()
+            return
+        }
+        loadedPlanWorkoutId = null
+        loadedAheadOfSchedule = false
         pendingRestore = runPersistence.load() != null
         if (pendingRestore && isBound) tryRestoreRunningSchedule()
+    }
+
+    private fun adoptLiveRun() {
+        schedule.clear()
+        layoutRunning.visibility = View.VISIBLE
+        btnSave.isEnabled = false
+        btnLoad.isEnabled = false
+        if (scheduleManager.isPreparing) {
+            schedule.addAll(scheduleManager.prepItems.map { it.copy() })
+            inPrepCountdown = true
+            tvCurrentPeriod.text = "Get ready…"
+        } else {
+            schedule.addAll(scheduleManager.getItems().map { it.copy() })
+            isRunning = true
+            scheduleAdapter.setRunningMode(true)
+            scheduleAdapter.setActiveIndex(scheduleManager.currentIndex)
+            if (scheduleManager.isPaused) {
+                tvCurrentPeriod.text = "Paused"
+                tvCountdown.text = formatMs(scheduleManager.pausedRemainingMs)
+            }
+        }
+        scheduleAdapter.notifyDataSetChanged()
+        refreshScheduleControls()
+        refreshTotals()
     }
 
     /**
@@ -235,17 +277,28 @@ class ScheduleEmbeddedView(
 
     private fun persistRunState() {
         if ((!isRunning && !inPrepCountdown) || schedule.isEmpty()) return
+        val now = System.currentTimeMillis()
+        lastPersistMs = now
         val items = if (isRunning) scheduleManager.getItems() else schedule
         if (isRunning) syncScheduleFromManager(items)
         val idx = if (isRunning) scheduleManager.currentIndex else 0
-        val startMs = items.getOrNull(idx)?.actualStartTime ?: System.currentTimeMillis()
+        // Saved as "when the current period would have started without pauses or edits",
+        // which is what resume() measures against. During the countdown it is the moment
+        // the first period begins, never 0 (that would read as the run being long over).
+        val startMs = if (isRunning) {
+            ScheduleTiming.effectiveStart(now, items.getOrNull(idx)?.durationMs ?: 0L,
+                scheduleManager.pausedRemainingMs)
+        } else {
+            scheduleManager.prepEndsAtMs.takeIf { it > 0L } ?: now
+        }
         runPersistence.save(
             ScheduleRunPersistence.Snapshot(
                 items = items,
                 currentIndex = idx,
                 periodStartMs = startMs,
                 paused = scheduleManager.isPaused,
-                remainingMs = scheduleManager.pausedRemainingMs
+                remainingMs = scheduleManager.pausedRemainingMs,
+                planWorkoutId = loadedPlanWorkoutId
             )
         )
     }
@@ -259,6 +312,9 @@ class ScheduleEmbeddedView(
     private fun tryRestoreRunningSchedule() {
         pendingRestore = false
         val snap = runPersistence.load() ?: return
+        if (scheduleManager.isRunning || scheduleManager.isPreparing) return
+        loadedPlanWorkoutId = snap.planWorkoutId
+        loadedAheadOfSchedule = false
         schedule.clear()
         schedule.addAll(snap.items)
         scheduleAdapter.notifyDataSetChanged()
@@ -361,6 +417,44 @@ class ScheduleEmbeddedView(
             Toast.makeText(activity, "Add at least one period first", Toast.LENGTH_SHORT).show()
             return
         }
+        if (!canTrackSteps()) {
+            askForTrackingPermission()
+            return
+        }
+        beginSchedule()
+    }
+
+    private fun canTrackSteps() =
+        TrackingPermissions.canTrack(activity) && TrackingPermissions.canStartForeground(activity)
+
+    private fun askForTrackingPermission() {
+        AlertDialog.Builder(activity)
+            .setTitle(R.string.permission_rationale_title)
+            .setMessage(R.string.permission_rationale_message)
+            .setPositiveButton(R.string.permission_rationale_continue) { _, _ ->
+                ActivityCompat.requestPermissions(activity, TrackingPermissions.all(),
+                    TrackingPermissions.REQUEST_SCHEDULE)
+            }
+            .setNeutralButton("Timer only") { _, _ -> beginSchedule() }
+            .setNegativeButton(R.string.permission_rationale_cancel, null)
+            .show()
+    }
+
+    /** Result of the permission request made by [askForTrackingPermission]. */
+    fun onPermissionsResult() {
+        if (isRunning || inPrepCountdown || schedule.isEmpty()) return
+        if (canTrackSteps()) { beginSchedule(); return }
+        AlertDialog.Builder(activity)
+            .setTitle("Step tracking is off")
+            .setMessage("Without the activity permission the schedule can still run its timer " +
+                "and cues, but steps and distance won't be recorded.")
+            .setPositiveButton("Run timer only") { _, _ -> beginSchedule() }
+            .setNegativeButton("Cancel", null)
+            .show()
+    }
+
+    private fun beginSchedule() {
+        if (isRunning || inPrepCountdown || schedule.isEmpty()) return
         spokenMarkers.clear()
         inPrepCountdown = true
         layoutRunning.visibility = View.VISIBLE
@@ -435,7 +529,7 @@ class ScheduleEmbeddedView(
             inPrepCountdown = false
             isRunning = true
             scheduleAdapter.setRunningMode(true)
-            startStepTracking(schedule.first().type)
+            startStepTracking(schedule.firstOrNull()?.type ?: ActivityType.WALKING)
             syncScheduleFromManager(scheduleManager.getItems())
             refreshScheduleControls()
         }
@@ -454,7 +548,7 @@ class ScheduleEmbeddedView(
                 append("  ·  period ${periodIndex + 1} of ${schedule.size}")
             }
             scheduleAdapter.setActiveIndex(periodIndex)
-            persistRunState()
+            if (System.currentTimeMillis() - lastPersistMs >= TICK_PERSIST_INTERVAL_MS) persistRunState()
             maybeSpeakProgress(periodIndex, remainingMs)
         }
     }
@@ -531,6 +625,8 @@ class ScheduleEmbeddedView(
      * for recovery — so say so, and leave the remaining dates where they are.
      */
     private fun showAheadOfPlanNote(w: PlannedWorkout) {
+        // The run can finish after this screen was replaced; a dialog there would crash.
+        if (activity.isFinishing || activity.isDestroyed) return
         val daysEarly = -w.daysLate()
         AlertDialog.Builder(activity)
             .setTitle("You're ahead of plan")
@@ -555,6 +651,8 @@ class ScheduleEmbeddedView(
 
     private fun startStepTracking(initialType: ActivityType) {
         if (stepService?.isTracking == true) return
+        // Android 14+ kills the app if the service can't enter the foreground.
+        if (!canTrackSteps()) return
         ContextCompat.startForegroundService(activity,
             Intent(activity, StepTrackerService::class.java).apply {
                 action = StepTrackerService.ACTION_START
@@ -600,6 +698,9 @@ class ScheduleEmbeddedView(
 
         /** Below this, quarter-point cues would fire every few minutes for no benefit. */
         private const val MIN_VOICE_SESSION_MS = 10 * 60_000L
+
+        /** Ticks arrive every 250 ms; the restore snapshot doesn't need to be that fresh. */
+        private const val TICK_PERSIST_INTERVAL_MS = 5_000L
 
         /** How far ahead a finished-early preload may reach. */
         const val PRELOAD_WINDOW_DAYS = 3

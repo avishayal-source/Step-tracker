@@ -16,7 +16,9 @@ class ScheduleRunPersistence(context: Context) {
         val currentIndex: Int,
         val periodStartMs: Long,
         val paused: Boolean = false,
-        val remainingMs: Long = 0L
+        val remainingMs: Long = 0L,
+        /** Planned workout being run, so finishing after a restore still marks it done. */
+        val planWorkoutId: Long? = null
     )
 
     fun save(snapshot: Snapshot) {
@@ -31,6 +33,10 @@ class ScheduleRunPersistence(context: Context) {
             })
         }
         prefs.edit()
+            .apply {
+                if (snapshot.planWorkoutId != null) putLong("plan_workout_id", snapshot.planWorkoutId)
+                else remove("plan_workout_id")
+            }
             .putString("items", arr.toString())
             .putInt("index", snapshot.currentIndex)
             .putLong("period_start", snapshot.periodStartMs)
@@ -59,7 +65,9 @@ class ScheduleRunPersistence(context: Context) {
                 currentIndex = prefs.getInt("index", 0),
                 periodStartMs = prefs.getLong("period_start", 0L),
                 paused = prefs.getBoolean("paused", false),
-                remainingMs = prefs.getLong("remaining_ms", 0L)
+                remainingMs = prefs.getLong("remaining_ms", 0L),
+                planWorkoutId = if (prefs.contains("plan_workout_id"))
+                    prefs.getLong("plan_workout_id", 0L) else null
             )
         } catch (_: Exception) {
             clear()

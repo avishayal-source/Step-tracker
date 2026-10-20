@@ -14,6 +14,6 @@ object CoachProfile {
     /** Body mass in kg from the coach form, or null if unset / out of range. */
     fun weightKg(context: Context): Double? {
         val raw = SecurePrefs.open(context, PREFS).getString(KEY_WEIGHT, null) ?: return null
-        return raw.toDoubleOrNull()?.takeIf { it in 25.0..300.0 }
+        return Format.parseDecimal(raw)?.takeIf { it in 25.0..300.0 }
     }
 }

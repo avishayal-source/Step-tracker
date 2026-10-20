@@ -66,15 +66,9 @@ class StepDetector(private val listener: StepListener) : SensorEventListener {
     }
 
     // ── Sensor timestamp → wall-clock ─────────────────────────────────────────
-    private var offsetMs = 0L
-    private var offsetInitialised = false
+    private var sensorClock = SensorClock()
 
-    private fun bootNsToWallMs(bootNs: Long): Long {
-        val raw = System.currentTimeMillis() - bootNs / 1_000_000L
-        offsetMs = if (!offsetInitialised) { offsetInitialised = true; raw }
-                   else (offsetMs * 15 + raw) / 16
-        return offsetMs + bootNs / 1_000_000L
-    }
+    private fun bootNsToWallMs(bootNs: Long): Long = sensorClock.toWallMs(bootNs)
 
     // ── Peak / step detection (shared with the calibration wizard) ────────────
     private val peaks       = StepPeakDetector()
@@ -577,7 +571,7 @@ class StepDetector(private val listener: StepListener) : SensorEventListener {
         slowSinceMs = 0L; slowStreakMs = 0L
         lowImpactSinceMs = 0L; lowImpactStreakMs = 0L
         motionBurstCount = 0; lastCountedWallMs = 0L
-        offsetInitialised = false
+        sensorClock = SensorClock()
         stateCandidate = null; switchAccumMs = 0.0
         kalmanInitialised = false; kalmanX = 0.0; kalmanP = 1.0; lastKalmanGain = null
         latestGpsRawSpeedMps = null; latestGpsTimeMs = 0L

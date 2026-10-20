@@ -377,31 +377,24 @@ class MainActivity : AppCompatActivity() {
 
     // ── Permissions ───────────────────────────────────────────────────────────
 
-    private fun allPerms() = buildList {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) add(Manifest.permission.ACTIVITY_RECOGNITION)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) add(Manifest.permission.POST_NOTIFICATIONS)
-        add(Manifest.permission.ACCESS_FINE_LOCATION)
-        add(Manifest.permission.ACCESS_COARSE_LOCATION)
-    }.toTypedArray()
+    private fun allPerms() = TrackingPermissions.all()
 
-    private fun hasLocationPerm(): Boolean =
-        ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_FINE_LOCATION) ==
-            PackageManager.PERMISSION_GRANTED ||
-            ContextCompat.checkSelfPermission(this, Manifest.permission.ACCESS_COARSE_LOCATION) ==
-                PackageManager.PERMISSION_GRANTED
+    private fun hasLocationPerm(): Boolean = TrackingPermissions.hasLocation(this)
 
-    private fun hasTrackingPerms() = (if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q)
-        listOf(Manifest.permission.ACTIVITY_RECOGNITION) else emptyList())
-        .all { ContextCompat.checkSelfPermission(this, it) == PackageManager.PERMISSION_GRANTED }
+    private fun hasTrackingPerms() =
+        TrackingPermissions.canTrack(this) && TrackingPermissions.canStartForeground(this)
 
     override fun onRequestPermissionsResult(rc: Int, perms: Array<out String>, results: IntArray) {
         super.onRequestPermissionsResult(rc, perms, results)
-        if (rc == 100) {
+        if (rc == TrackingPermissions.REQUEST_SCHEDULE) {
+            if (::scheduleView.isInitialized) scheduleView.onPermissionsResult()
+            return
+        }
+        if (rc == TrackingPermissions.REQUEST_TRACKING) {
             if (hasTrackingPerms()) {
                 startTrackingService()
                 // Warn if location was specifically denied — tracking still works, just no GPS
-                val locIdx = perms.indexOf(Manifest.permission.ACCESS_FINE_LOCATION)
-                if (locIdx >= 0 && results[locIdx] != PackageManager.PERMISSION_GRANTED) {
+                if (!hasLocationPerm()) {
                     Toast.makeText(this, "Location denied — distance will use step counting only",
                         Toast.LENGTH_LONG).show()
                 }
@@ -448,7 +441,7 @@ class MainActivity : AppCompatActivity() {
             .setTitle(R.string.permission_rationale_title)
             .setMessage(R.string.permission_rationale_message)
             .setPositiveButton(R.string.permission_rationale_continue) { _, _ ->
-                ActivityCompat.requestPermissions(this, allPerms(), 100)
+                ActivityCompat.requestPermissions(this, allPerms(), TrackingPermissions.REQUEST_TRACKING)
             }
             .setNegativeButton(R.string.permission_rationale_cancel, null)
             .show()
@@ -793,10 +786,10 @@ class MainActivity : AppCompatActivity() {
             .setPositiveButton("Save") { _, _ ->
                 val walkSteps = etWalkSteps.text.toString().toIntOrNull()
                 val runSteps = etRunSteps.text.toString().toIntOrNull()
-                val walkKm = etWalkKm.text.toString().toDoubleOrNull()
-                val runKm = etRunKm.text.toString().toDoubleOrNull()
-                val walkMin = etWalkMin.text.toString().toDoubleOrNull()
-                val runMin = etRunMin.text.toString().toDoubleOrNull()
+                val walkKm = Format.parseDecimal(etWalkKm.text.toString())
+                val runKm = Format.parseDecimal(etRunKm.text.toString())
+                val walkMin = Format.parseDecimal(etWalkMin.text.toString())
+                val runMin = Format.parseDecimal(etRunMin.text.toString())
                 if (walkSteps == null || runSteps == null || walkKm == null || runKm == null ||
                     walkMin == null || runMin == null ||
                     walkSteps < 0 || runSteps < 0 || walkKm < 0 || runKm < 0 || walkMin < 0 || runMin < 0

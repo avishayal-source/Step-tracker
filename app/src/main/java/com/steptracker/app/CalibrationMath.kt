@@ -58,4 +58,13 @@ object CalibrationMath {
     /** Metres per impact from a typed distance, or null when it is unusable. */
     fun strideFromManual(steps: Int, distM: Double?): Double? =
         if (steps >= MIN_STEPS && distM != null && distM >= MIN_MANUAL_DIST_M) distM / steps else null
+
+    /** Faster than any jog (~29 km/h): the fix jumped, the runner didn't. */
+    const val MAX_GPS_SPEED_MPS = 8.0
+
+    fun isGpsBounce(deltaM: Double, dtSec: Double): Boolean =
+        deltaM / dtSec.coerceAtLeast(0.001) > MAX_GPS_SPEED_MPS
+
+    /** Below 0.5 m is standing-still jitter; above 40 m between 0.5 s fixes is a jump. */
+    fun countsAsGpsDistance(deltaM: Double): Boolean = deltaM in 0.5..40.0
 }

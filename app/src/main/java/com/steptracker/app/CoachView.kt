@@ -380,14 +380,14 @@ class CoachView(
     }
 
     private fun evaluate() {
-        val distance = etDistance.text.toString().toDoubleOrNull()
+        val distance = Format.parseDecimal(etDistance.text.toString())
         val weeks    = etWeeks.text.toString().toIntOrNull()
         val age      = etAge.text.toString().toIntOrNull()
-        val weight   = etWeight.text.toString().toDoubleOrNull()
-        val height   = etHeight.text.toString().toDoubleOrNull()
+        val weight   = Format.parseDecimal(etWeight.text.toString())
+        val height   = Format.parseDecimal(etHeight.text.toString())
         val days     = etDays.text.toString().toIntOrNull()
-        val currentRun = etCurrentRun.text.toString().toDoubleOrNull() ?: 0.0
-        val targetTime = etTime.text.toString().toDoubleOrNull()
+        val currentRun = Format.parseDecimal(etCurrentRun.text.toString()) ?: 0.0
+        val targetTime = Format.parseDecimal(etTime.text.toString())
         val preferContinuous = styleContinuous.isChecked
 
         val missing = when {

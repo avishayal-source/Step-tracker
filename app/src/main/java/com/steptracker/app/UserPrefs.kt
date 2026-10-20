@@ -35,8 +35,10 @@ class UserPrefs(context: Context) {
                 .apply()
         }
 
+    // No legacy fallback: the old single "calibrated" flag can't say which gait was
+    // measured, and claiming a jog calibration that never happened is the worse error.
     var runCalibrated: Boolean
-        get() = prefs.getBoolean("run_calibrated", prefs.getBoolean("calibrated", false))
+        get() = prefs.getBoolean("run_calibrated", false)
         set(v) {
             prefs.edit()
                 .putBoolean("run_calibrated", v)
