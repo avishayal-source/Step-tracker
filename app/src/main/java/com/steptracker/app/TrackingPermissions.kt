@@ -27,6 +27,9 @@ object TrackingPermissions {
         granted(ctx, Manifest.permission.ACCESS_FINE_LOCATION) ||
             granted(ctx, Manifest.permission.ACCESS_COARSE_LOCATION)
 
+    /** GPS distance needs precise location; approximate-only can't use the GPS provider. */
+    fun hasFineLocation(ctx: Context): Boolean = granted(ctx, Manifest.permission.ACCESS_FINE_LOCATION)
+
     /** Step counting needs activity recognition from Android 10. */
     fun canTrack(ctx: Context): Boolean =
         Build.VERSION.SDK_INT < Build.VERSION_CODES.Q || granted(ctx, Manifest.permission.ACTIVITY_RECOGNITION)

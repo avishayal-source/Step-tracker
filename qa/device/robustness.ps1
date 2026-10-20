@@ -33,12 +33,18 @@ function Shot([string]$name) {
     Sh "screencap -p /sdcard/qa_shot.png" | Out-Null
     Adb pull /sdcard/qa_shot.png (Join-Path $out "$name.png") | Out-Null
 }
-function ClearCrashes { Sh 'logcat -b crash -c' | Out-Null }
-function Record([string]$check, [string]$note = '') {
+function ClearCrashes { Sh 'logcat -b crash -c' | Out-Null; Sh 'logcat -b events -c' | Out-Null }
+# An ANR is a failure just like a crash: the system logs it as am_anr in the events buffer.
+function Record([string]$check, [string]$note = '', [bool]$anrSeen = $false) {
     $crash = (Sh 'logcat -b crash -d') -join "`n"
     $mine = $crash -match [regex]::Escape($Package)
-    if ($mine) { $crash | Set-Content (Join-Path $out "crash_$($check -replace '\W','_').txt") }
-    $results.Add([pscustomobject]@{ Check = $check; Result = $(if ($mine) { 'CRASH' } else { 'ok' }); Note = $note })
+    $events = (Sh 'logcat -b events -d -s am_anr') -join "`n"
+    $anr = $anrSeen -or ($events -match [regex]::Escape($Package))
+    $tag = $check -replace '\W','_'
+    if ($mine) { $crash | Set-Content (Join-Path $out "crash_$tag.txt") }
+    if ($anr) { $events | Set-Content (Join-Path $out "anr_$tag.txt") }
+    $result = if ($mine) { 'CRASH' } elseif ($anr) { 'ANR' } else { 'ok' }
+    $results.Add([pscustomobject]@{ Check = $check; Result = $result; Note = $note })
     ClearCrashes
 }
 
@@ -52,7 +58,8 @@ if ($Suite -in 'All', 'Monkey') {
     $log = Sh "monkey -p $Package -s $Seed --throttle 120 --pct-syskeys 0 --pct-appswitch 5 --ignore-security-exceptions -v $Events"
     $log | Set-Content (Join-Path $out 'monkey.txt')
     $note = ($log | Select-String -Pattern 'CRASH|ANR|Monkey aborted' | Select-Object -First 3) -join ' | '
-    Record "monkey seed=$Seed events=$Events" $note
+    $monkeyAnr = [bool]($log | Select-String -Pattern "ANR in $([regex]::Escape($Package))|NOT RESPONDING: $([regex]::Escape($Package))")
+    Record "monkey seed=$Seed events=$Events" $note $monkeyAnr
     Sh "am force-stop $Package" | Out-Null
 }
 
@@ -137,4 +144,6 @@ if ($Suite -in 'All', 'Power') {
 }
 
 $results | Format-Table -AutoSize | Out-String | Tee-Object (Join-Path $out 'summary.txt')
-if ($results.Result -contains 'CRASH') { Write-Host 'CRASHES FOUND - see crash_*.txt' -ForegroundColor Red; exit 1 }
+if ($results.Result -contains 'CRASH' -or $results.Result -contains 'ANR') {
+    Write-Host 'CRASHES/ANRs FOUND - see crash_*.txt / anr_*.txt' -ForegroundColor Red; exit 1
+}

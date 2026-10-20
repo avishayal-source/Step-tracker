@@ -14,7 +14,8 @@ import java.util.concurrent.TimeUnit
  */
 class WorkoutHistory(context: Context) {
 
-    private val dao = AppDatabase.get(context).workoutDao()
+    private val db = AppDatabase.get(context)
+    private val dao = db.workoutDao()
     private val legacyPrefs = context.getSharedPreferences("workout_history", Context.MODE_PRIVATE)
 
     init {
@@ -24,14 +25,20 @@ class WorkoutHistory(context: Context) {
     // ── CRUD (unchanged public API) ──────────────────────────────────────────
     fun loadAll(): List<WorkoutRecord> = dao.getAll()
 
-    fun save(r: WorkoutRecord) {
-        dao.insert(r)
-        dao.trimToMostRecent(365)   // keep last 365 sessions, as before
-    }
+    // No retention cap: History's "ALL TIME" totals must cover every saved session.
+    fun save(r: WorkoutRecord) = dao.insert(r)
 
     fun delete(id: Long) = dao.deleteById(id)
 
     fun clearAll() = dao.clearAll()
+
+    /** Swaps the whole History in one transaction: either every record lands or none change. */
+    fun replaceAll(records: List<WorkoutRecord>) {
+        db.runInTransaction {
+            dao.clearAll()
+            dao.insertAll(records)
+        }
+    }
 
     /**
      * Fills [WorkoutRecord.caloriesKcal] for rows saved before calories existed

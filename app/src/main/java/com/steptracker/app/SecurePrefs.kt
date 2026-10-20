@@ -2,6 +2,7 @@ package com.steptracker.app
 
 import android.content.Context
 import android.content.SharedPreferences
+import android.util.Log
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 
@@ -33,7 +34,8 @@ object SecurePrefs {
                 EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
                 EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
             )
-        } catch (_: Exception) {
+        } catch (e: Exception) {
+            Log.w("SecurePrefs", "Encrypted prefs unavailable for $name; using app-private storage", e)
             context.getSharedPreferences(name, Context.MODE_PRIVATE)
         }
     }

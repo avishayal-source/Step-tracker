@@ -66,14 +66,17 @@ class UserPrefs(context: Context) {
         get() = prefs.getBoolean("seen_product_help", false)
         set(v) { prefs.edit().putBoolean("seen_product_help", v).apply() }
 
-    /**
-     * We already offered the "allow unrestricted battery" screen once.
-     * Pixels (and other OEMs) can pause sensors with the screen off unless this
-     * exemption is granted — don't nag every session.
-     */
-    var askedBatteryUnrestricted: Boolean
-        get() = prefs.getBoolean("asked_battery_unrestricted", false)
-        set(v) { prefs.edit().putBoolean("asked_battery_unrestricted", v).apply() }
+    /** When the "allow unrestricted battery" offer was last shown (0 = never). */
+    var batteryPromptLastMs: Long
+        get() = prefs.getLong("battery_prompt_last_ms",
+            // Users who saw the old one-time prompt count as asked "a while ago".
+            if (prefs.getBoolean("asked_battery_unrestricted", false)) 1L else 0L)
+        set(v) { prefs.edit().putLong("battery_prompt_last_ms", v).apply() }
+
+    /** How many times the user answered "Not now". */
+    var batteryPromptDeclines: Int
+        get() = prefs.getInt("battery_prompt_declines", 0)
+        set(v) { prefs.edit().putInt("battery_prompt_declines", v).apply() }
 
     companion object {
         /**

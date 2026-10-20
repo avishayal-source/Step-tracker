@@ -49,6 +49,7 @@ class MainActivity : AppCompatActivity() {
             isBound = true
             service?.onUpdateListener = { runOnUiThread { updateTrackingUI() } }
             updateTrackingUI()
+            service?.let { offerInterruptedSession(it) }
             if (service?.isTracking == true) {
                 stopwatchHandler.removeCallbacks(stopwatchRunnable)
                 stopwatchHandler.post(stopwatchRunnable)
@@ -101,16 +102,25 @@ class MainActivity : AppCompatActivity() {
         ActivityResultContracts.CreateDocument(BackupManager.mimeType)
     ) { uri: Uri? ->
         if (uri == null) return@registerForActivityResult
-        try {
-            BackupManager.exportToUri(this, uri)
-            Toast.makeText(this, R.string.backup_export_ok, Toast.LENGTH_LONG).show()
-        } catch (e: Exception) {
-            Toast.makeText(
-                this,
-                getString(R.string.backup_export_fail, e.message ?: "error"),
-                Toast.LENGTH_LONG
-            ).show()
+        inBackground({ BackupManager.exportToUri(this, uri) }) { result ->
+            result.onSuccess {
+                Toast.makeText(this, R.string.backup_export_ok, Toast.LENGTH_LONG).show()
+            }.onFailure { e ->
+                Toast.makeText(
+                    this,
+                    getString(R.string.backup_export_fail, e.message ?: "error"),
+                    Toast.LENGTH_LONG
+                ).show()
+            }
         }
+    }
+
+    /** File and database work for backups; the result is delivered on the main thread. */
+    private fun <T> inBackground(work: () -> T, done: (Result<T>) -> Unit) {
+        Thread {
+            val result = runCatching(work)
+            runOnUiThread { if (!isDestroyed) done(result) }
+        }.start()
     }
 
     private val importBackupLauncher = registerForActivityResult(
@@ -288,6 +298,9 @@ class MainActivity : AppCompatActivity() {
                 R.id.action_audio_settings -> {
                     showAudioSettings(); true
                 }
+                R.id.action_background_tracking -> {
+                    showBatteryUnrestrictedFromMenu(); true
+                }
                 R.id.action_quick_help -> {
                     startActivity(HelpActivity.intent(this)); true
                 }
@@ -394,8 +407,9 @@ class MainActivity : AppCompatActivity() {
             if (hasTrackingPerms()) {
                 startTrackingService()
                 // Warn if location was specifically denied — tracking still works, just no GPS
-                if (!hasLocationPerm()) {
-                    Toast.makeText(this, "Location denied — distance will use step counting only",
+                if (!TrackingPermissions.hasFineLocation(this)) {
+                    val why = if (hasLocationPerm()) "Precise location is off" else "Location denied"
+                    Toast.makeText(this, "$why — distance will use step counting only",
                         Toast.LENGTH_LONG).show()
                 }
             } else {
@@ -409,7 +423,13 @@ class MainActivity : AppCompatActivity() {
     // ── Tracking ──────────────────────────────────────────────────────────────
 
     private fun toggleTracking() {
-        val svc = service ?: return
+        val svc = service
+        if (svc == null) {
+            // Not bound yet. Starting doesn't need the binder; a duplicate start is ignored
+            // by the service, so this is safe even if a session is already running.
+            if (hasTrackingPerms()) startTrackingService() else requestTrackingPermissions()
+            return
+        }
         when {
             svc.isTracking && svc.isPaused -> {
                 svc.resumeTracking()
@@ -428,7 +448,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun stopTrackingSession() {
-        val svc = service ?: return
+        val svc = service ?: run { notConnectedYet(); return }
         if (!svc.isTracking) return
         svc.stopTracking()
         stopwatchHandler.removeCallbacks(stopwatchRunnable)
@@ -447,8 +467,52 @@ class MainActivity : AppCompatActivity() {
             .show()
     }
 
+    private var interruptedDialogShown = false
+
+    /** A workout cut off when Android killed the app: continue it or keep what was recorded. */
+    private fun offerInterruptedSession(svc: StepTrackerService) {
+        val store = ActiveSessionStore(this)
+        val autoSaved = store.autoSavedSteps
+        if (autoSaved > 0) {
+            store.autoSavedSteps = 0
+            Toast.makeText(this, getString(R.string.interrupted_auto_saved, autoSaved), Toast.LENGTH_LONG).show()
+            updateHistoryUI()
+        }
+        val s = svc.interruptedSession() ?: return
+        if (interruptedDialogShown) return
+        interruptedDialogShown = true
+        val time = java.text.DateFormat.getTimeInstance(java.text.DateFormat.SHORT).format(java.util.Date(s.savedAtMs))
+        AlertDialog.Builder(this)
+            .setTitle(R.string.interrupted_title)
+            .setMessage(getString(R.string.interrupted_message, time, s.totalSteps))
+            .setCancelable(false)
+            .setPositiveButton(R.string.interrupted_continue) { _, _ ->
+                if (hasTrackingPerms()) {
+                    ContextCompat.startForegroundService(this,
+                        Intent(this, StepTrackerService::class.java).apply {
+                            action = StepTrackerService.ACTION_RECOVER
+                        })
+                    stopwatchHandler.removeCallbacks(stopwatchRunnable)
+                    stopwatchHandler.post(stopwatchRunnable)
+                } else {
+                    svc.saveInterruptedSession()
+                    updateHistoryUI()
+                }
+                updateTrackingUI()
+            }
+            .setNegativeButton(R.string.interrupted_save) { _, _ ->
+                svc.saveInterruptedSession()
+                updateHistoryUI()
+                updateTrackingUI()
+            }
+            .show()
+    }
+
+    private fun notConnectedYet() =
+        Toast.makeText(this, "Just a moment — still connecting to the tracker", Toast.LENGTH_SHORT).show()
+
     private fun confirmReset() {
-        val svc = service ?: return
+        val svc = service ?: run { notConnectedYet(); return }
         if (svc.isTracking) { Toast.makeText(this,"Stop tracking first",Toast.LENGTH_SHORT).show(); return }
         AlertDialog.Builder(this).setTitle("Reset session data?")
             .setMessage("This clears the current session. Workout history is preserved.")
@@ -457,8 +521,8 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun confirmAndRestoreBackup(uri: Uri) {
-        try {
-            val summary = BackupManager.peekSummary(this, uri)
+        inBackground({ BackupManager.peekSummary(this, uri) }) { result ->
+            val summary = result.getOrElse { e -> showRestoreFailure(e); return@inBackground }
             val planNote = if (summary.hasPlan) " · includes training plan" else ""
             AlertDialog.Builder(this)
                 .setTitle(R.string.backup_restore_title)
@@ -471,31 +535,31 @@ class MainActivity : AppCompatActivity() {
                         planNote
                     )
                 )
-                .setPositiveButton(R.string.backup_restore_confirm) { _, _ ->
-                    try {
-                        BackupManager.importFromUri(this, uri)
-                        userPrefs = UserPrefs(this)
-                        coachView.reloadAfterBackupRestore()
-                        updateTrackingUI()
-                        updateHistoryUI()
-                        Toast.makeText(this, R.string.backup_restore_ok, Toast.LENGTH_LONG).show()
-                    } catch (e: Exception) {
-                        Toast.makeText(
-                            this,
-                            getString(R.string.backup_restore_fail, e.message ?: "error"),
-                            Toast.LENGTH_LONG
-                        ).show()
-                    }
-                }
+                .setPositiveButton(R.string.backup_restore_confirm) { _, _ -> runRestore(uri) }
                 .setNegativeButton(android.R.string.cancel, null)
                 .show()
-        } catch (e: Exception) {
-            Toast.makeText(
-                this,
-                getString(R.string.backup_restore_fail, e.message ?: "error"),
-                Toast.LENGTH_LONG
-            ).show()
         }
+    }
+
+    private fun runRestore(uri: Uri) {
+        Toast.makeText(this, R.string.backup_restore_running, Toast.LENGTH_SHORT).show()
+        inBackground({ BackupManager.importFromUri(this, uri) }) { result ->
+            result.onSuccess {
+                userPrefs = UserPrefs(this)
+                coachView.reloadAfterBackupRestore()
+                updateTrackingUI()
+                updateHistoryUI()
+                Toast.makeText(this, R.string.backup_restore_ok, Toast.LENGTH_LONG).show()
+            }.onFailure { showRestoreFailure(it) }
+        }
+    }
+
+    private fun showRestoreFailure(e: Throwable) {
+        val msg = if (e is BackupManager.InvalidBackupException)
+            getString(R.string.backup_restore_rejected, e.message ?: "damaged file")
+        else
+            getString(R.string.backup_restore_fail, e.message ?: "error")
+        Toast.makeText(this, msg, Toast.LENGTH_LONG).show()
     }
 
     private fun startTrackingService() {
@@ -511,16 +575,29 @@ class MainActivity : AppCompatActivity() {
 
     /**
      * Pixel / OEM battery savers often pause sensors when the screen is off unless the
-     * app is allowed to run unrestricted. Ask once — not on every Start.
+     * app is allowed to run unrestricted. Offered on Start, but "Not now" quiets it for
+     * a while rather than forever; the More menu can always open it.
      */
     private fun maybeOfferBatteryUnrestricted() {
-        if (userPrefs.askedBatteryUnrestricted) return
-        val pm = getSystemService(PowerManager::class.java) ?: return
-        if (pm.isIgnoringBatteryOptimizations(packageName)) {
-            userPrefs.askedBatteryUnrestricted = true
+        if (isBatteryUnrestricted()) return
+        if (!BatteryPrompt.shouldOffer(userPrefs.batteryPromptDeclines,
+                userPrefs.batteryPromptLastMs, System.currentTimeMillis())) return
+        showBatteryUnrestrictedDialog()
+    }
+
+    private fun isBatteryUnrestricted(): Boolean =
+        getSystemService(PowerManager::class.java)?.isIgnoringBatteryOptimizations(packageName) == true
+
+    private fun showBatteryUnrestrictedFromMenu() {
+        if (isBatteryUnrestricted()) {
+            Toast.makeText(this, R.string.battery_already_unrestricted, Toast.LENGTH_LONG).show()
             return
         }
-        userPrefs.askedBatteryUnrestricted = true
+        showBatteryUnrestrictedDialog()
+    }
+
+    private fun showBatteryUnrestrictedDialog() {
+        userPrefs.batteryPromptLastMs = System.currentTimeMillis()
         AlertDialog.Builder(this)
             .setTitle(R.string.battery_unrestricted_title)
             .setMessage(R.string.battery_unrestricted_message)
@@ -543,7 +620,9 @@ class MainActivity : AppCompatActivity() {
                     }
                 }
             }
-            .setNegativeButton(R.string.battery_unrestricted_not_now, null)
+            .setNegativeButton(R.string.battery_unrestricted_not_now) { _, _ ->
+                userPrefs.batteryPromptDeclines += 1
+            }
             .show()
     }
 
@@ -619,9 +698,10 @@ class MainActivity : AppCompatActivity() {
         tvCurrentActivity.setTextColor(pillTextColor)
 
         // ── GPS indicator (also when idle, so Location grant is not easy to miss) ─
-        val hasFineLocation = hasLocationPerm()
         tvGpsIndicator.text = when {
-            !hasFineLocation -> "Location off — tap Start once to enable GPS distance"
+            !hasLocationPerm() -> "Location off — tap Start once to enable GPS distance"
+            !TrackingPermissions.hasFineLocation(this) ->
+                "Approximate location only — distance from steps. Allow precise location for GPS."
             !svc.isTracking  -> "Location on"
             svc.gpsAvailable -> "GPS active"
             else             -> "GPS acquiring…"

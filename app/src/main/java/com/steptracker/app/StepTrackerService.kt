@@ -29,6 +29,9 @@ class StepTrackerService : Service(), StepDetector.StepListener {
         const val ACTION_STOP          = "STOP"
         const val ACTION_PAUSE         = "PAUSE"
         const val ACTION_RESUME        = "RESUME"
+        /** Continue a workout that was cut off by process death. */
+        const val ACTION_RECOVER       = "RECOVER"
+        private const val SNAPSHOT_INTERVAL_MS = 10_000L
         const val EXTRA_INITIAL_TYPE   = "initial_type"
         private const val WAKE_LOCK_TIMEOUT_MS = 2 * 60 * 60 * 1000L
         private const val WAKE_LOCK_RENEW_MS   = 60 * 60 * 1000L
@@ -130,6 +133,7 @@ class StepTrackerService : Service(), StepDetector.StepListener {
         sensorManager   = getSystemService(SENSOR_SERVICE) as SensorManager
         userPrefs       = UserPrefs(this)
         workoutHistory  = WorkoutHistory(this)
+        sessionStore    = ActiveSessionStore(this)
         stepDetector    = StepDetector(this)
         locationManager = getSystemService(Context.LOCATION_SERVICE) as LocationManager
         val pm = getSystemService(Context.POWER_SERVICE) as PowerManager
@@ -174,8 +178,118 @@ class StepTrackerService : Service(), StepDetector.StepListener {
             ACTION_PAUSE  -> pauseTracking()
             ACTION_RESUME -> resumeTracking()
             ACTION_STOP   -> stopTracking()
+            ACTION_RECOVER -> if (!continueInterruptedSession()) {
+                // Started with startForegroundService: must still enter the foreground once.
+                if (startInForeground(buildNotification("Saving your workout…"))) {
+                    stopForeground(STOP_FOREGROUND_REMOVE)
+                }
+                saveInterruptedSession()
+                stopSelf()
+            }
+            // Sticky restart after the process was killed.
+            null -> recoverAfterRestart()
         }
         return START_STICKY
+    }
+
+    // ── Interrupted-workout recovery ──────────────────────────────────────────
+
+    private lateinit var sessionStore: ActiveSessionStore
+    private var lastSnapshotMs = 0L
+
+    /** Persists the live session so process death can't silently lose it. */
+    private fun snapshotSession(force: Boolean = false) {
+        if (!isTracking) return
+        val now = System.currentTimeMillis()
+        if (!force && now - lastSnapshotMs < SNAPSHOT_INTERVAL_MS) return
+        lastSnapshotMs = now
+        sessionStore.save(ActiveSession(
+            sessionStartMs = sessionStartMs,
+            activeElapsedMs = sessionElapsedMs(),
+            paused = isPaused,
+            totalSteps = totalSteps,
+            periods = activityPeriods.map { it.copy() },
+            savedAtMs = now
+        ))
+    }
+
+    /** A workout cut off by process death, waiting to be continued or saved. */
+    fun interruptedSession(): ActiveSession? = if (isTracking) null else sessionStore.load()
+
+    private fun loadSession(s: ActiveSession) {
+        activityPeriods.clear()
+        activityPeriods.addAll(ActiveSession.closedAtSnapshot(s))
+        currentPeriod = null
+        totalSteps = s.totalSteps
+        sessionStartMs = s.sessionStartMs
+        accumulatedElapsedMs = s.activeElapsedMs
+        segmentStartMs = 0L
+        lastGpsLocation = null
+    }
+
+    /** Saves the interrupted workout to History up to its last snapshot. Returns its steps. */
+    fun saveInterruptedSession(): Int {
+        if (isTracking) return 0
+        val s = sessionStore.load() ?: return 0
+        sessionStore.clear()
+        loadSession(s)
+        recomputeTotals()
+        if (totalSteps > 0) {
+            historySaved = true
+            saveWorkoutToHistory()
+        }
+        onUpdateListener?.invoke()
+        return totalSteps
+    }
+
+    /**
+     * Picks the interrupted workout back up. The time the process was dead counts as a
+     * pause: no steps, no active time. Returns false when it can't run in the foreground.
+     */
+    private fun continueInterruptedSession(): Boolean {
+        if (isTracking) return true
+        val s = sessionStore.load() ?: return false
+        if (!TrackingPermissions.canTrack(this) || !TrackingPermissions.canStartForeground(this)) return false
+        loadSession(s)
+        val now = System.currentTimeMillis()
+        isTracking = true
+        isPaused = s.paused
+        historySaved = false
+        segmentStartMs = now
+        val type = s.periods.lastOrNull()?.type?.takeIf { it != ActivityType.IDLE } ?: ActivityType.WALKING
+        stepDetector.reset(type)
+        openNewPeriod(type, now)
+        recomputeTotals()
+        if (!isPaused) {
+            sensorManager.registerListener(stepDetector,
+                sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER),
+                SensorManager.SENSOR_DELAY_GAME)
+            startGps()
+            holdWakeLock()
+        }
+        val text = if (isPaused) "Paused – $totalSteps steps" else "Tracking… (resumed)"
+        if (!startInForeground(buildNotification(text))) {
+            sensorManager.unregisterListener(stepDetector)
+            stopGps()
+            dropWakeLock()
+            isTracking = false
+            isPaused = false
+            return false
+        }
+        snapshotSession(force = true)
+        onUpdateListener?.invoke()
+        return true
+    }
+
+    private fun recoverAfterRestart() {
+        if (isTracking) return
+        val s = sessionStore.load()
+        if (s == null) { stopSelf(); return }
+        val recent = System.currentTimeMillis() - s.savedAtMs <= ActiveSession.CONTINUE_WINDOW_MS
+        if (recent && continueInterruptedSession()) return
+        val steps = saveInterruptedSession()
+        if (steps > 0) sessionStore.autoSavedSteps = steps
+        stopSelf()
     }
 
     override fun onBind(intent: Intent): IBinder = binder
@@ -190,6 +304,8 @@ class StepTrackerService : Service(), StepDetector.StepListener {
 
     fun startTracking(initialType: ActivityType = ActivityType.WALKING) {
         if (isTracking) return
+        // An interrupted workout nobody answered for is kept, not overwritten.
+        if (sessionStore.load() != null) saveInterruptedSession()
         // A finished session keeps totals on screen until Reset; a new Start must
         // not inherit them or the next Stop would save the old workout again.
         resetData()
@@ -209,6 +325,7 @@ class StepTrackerService : Service(), StepDetector.StepListener {
         holdWakeLock()
         openNewPeriod(seed, System.currentTimeMillis())
         if (!startInForeground(buildNotification("Tracking…"))) abortStart()
+        else snapshotSession(force = true)
     }
 
     /** Foreground start was refused (permission revoked mid-flight): undo, and say so. */
@@ -220,6 +337,7 @@ class StepTrackerService : Service(), StepDetector.StepListener {
         dropWakeLock()
         closeClassifierDebugLog()
         activityPeriods.clear(); currentPeriod = null
+        sessionStore.clear()
         onUpdateListener?.invoke()
         Toast.makeText(this, "Couldn't start step tracking — check the app's permissions",
             Toast.LENGTH_LONG).show()
@@ -235,6 +353,7 @@ class StepTrackerService : Service(), StepDetector.StepListener {
         stopGps()
         dropWakeLock()
         updateNotification("Paused – $totalSteps steps")
+        snapshotSession(force = true)
         onUpdateListener?.invoke()
     }
 
@@ -248,6 +367,7 @@ class StepTrackerService : Service(), StepDetector.StepListener {
         startGps()
         holdWakeLock()
         updateNotification("Tracking…")
+        snapshotSession(force = true)
         onUpdateListener?.invoke()
     }
 
@@ -278,6 +398,7 @@ class StepTrackerService : Service(), StepDetector.StepListener {
             historySaved = true
             saveWorkoutToHistory()
         }
+        sessionStore.clear()
         onUpdateListener?.invoke()
         closeClassifierDebugLog()
         // The tracking notification is ongoing (not swipeable), so it must go with the service.
@@ -385,6 +506,7 @@ class StepTrackerService : Service(), StepDetector.StepListener {
             lastNotifUpdateMs = now
             updateNotification(buildStatusText())
         }
+        snapshotSession()
         onUpdateListener?.invoke()
     }
 
@@ -430,6 +552,7 @@ class StepTrackerService : Service(), StepDetector.StepListener {
             currentActivity = newActivity
         )
         recomputeTotals()
+        snapshotSession(force = true)
         onUpdateListener?.invoke()
     }
 

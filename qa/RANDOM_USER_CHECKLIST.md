@@ -15,7 +15,8 @@ tagged **[auto]**.
 
 ## 2. Permissions (most common "it doesn't work")  **[auto]**
 - [ ] Location denied → workout still counts steps; UI says distance is step-estimated.
-- [ ] Location "approximate only" (Android 12+) → explained, not silently wrong distances.
+- [ ] Location "approximate only" (Android 12+) → status says "Approximate location only", not "Location on".
+- [ ] Tap Start immediately after launching the app → workout starts (or permissions are asked), never a silent no-op.
 - [ ] Physical activity denied → explained.
 - [ ] Notifications denied (Android 13+) → foreground service still starts; reminders explain they're off.
 - [ ] Exact alarms denied (Android 14) → workout reminders degrade gracefully.
@@ -36,6 +37,9 @@ tagged **[auto]**.
 - [ ] App swiped away from recents mid-workout → service survives or workout is saved.
 - [ ] Phone reboots mid-workout → on reopen the user is told what was saved.
 - [ ] Process killed while backgrounded (`am kill`) → timer/distance correct after reopen.
+- [ ] `adb shell am kill com.ywalk.app` / force-stop mid-workout, reopen → "Workout interrupted" dialog; Continue keeps steps and time, Save to History stores it.
+- [ ] Workout interrupted and not reopened for > 10 min, then the service restarts → saved automatically, toast on next open.
+- [ ] Decline "Background tracking" → offered again after 14 days, never after 3 declines; More → Background tracking always works.
 - [ ] Rotation / dark-mode toggle / font change mid-workout.
 - [ ] 3-hour workout (marathon walker): memory, battery %, History entry correct.
 - [ ] Battery drain over 60 min recorded (target: < 8 %/h with GPS).
@@ -70,7 +74,9 @@ tagged **[auto]**.
 - [ ] Low storage (< 200 MB) → saving a workout doesn't silently fail.
 - [ ] Edit a past workout with extreme values (0, 99999, 0.01 min) — see known defect #11.
 - [ ] Delete workout / delete plan are confirmable and undoable or clearly final.
-- [ ] Import a backup with > 365 workouts: are the oldest dropped, and do ALL TIME totals change? (finding #21)
+- [ ] Import a backup with > 365 workouts: all kept, ALL TIME totals unchanged (finding #21, fixed).
+- [ ] Restore a truncated / hand-damaged backup → "Backup not restored: …", History, plan and schedules unchanged.
+- [ ] Restore a large backup (thousands of workouts) → no "app not responding".
 
 ## 8. Botty / plans from a newcomer's point of view
 - [ ] Typo inputs (500 weeks, 1000 km, 1 day/week) — see known defects #6, #7, #9.

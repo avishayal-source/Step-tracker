@@ -4,8 +4,9 @@
 .EXAMPLE
   .\qa\run-qa.ps1                 # everything
   .\qa\run-qa.ps1 -Only Classifier  # one class (name fragment)
+  .\qa\run-qa.ps1 -Strict           # release gate: known defects fail the run too
 #>
-param([string]$Only = '')
+param([string]$Only = '', [switch]$Strict)
 
 $root = Split-Path $PSScriptRoot -Parent
 Push-Location $root
@@ -13,6 +14,8 @@ try {
     if (-not $env:JAVA_HOME) { $env:JAVA_HOME = 'C:\Program Files\Android\Android Studio\jbr' }
     $filter = if ($Only) { @('--tests', "*$Only*") } else { @() }
     $ErrorActionPreference = 'Continue'
+    # Stale XML from an earlier run would hide a build that no longer compiles.
+    Remove-Item 'app\build\test-results\testDebugUnitTest' -Recurse -Force -ErrorAction SilentlyContinue
     & .\gradlew.bat :app:testDebugUnitTest @filter --continue --console=plain *> $null
 
     $rows = foreach ($f in Get-ChildItem 'app\build\test-results\testDebugUnitTest' -Filter *.xml) {
@@ -38,7 +41,10 @@ try {
     $vu = 'app\build\qa-reports\virtual_users.txt'
     if (Test-Path $vu) { Write-Host ''; Get-Content $vu -Encoding UTF8 }
     Write-Host "`nHTML report: $root\app\build\reports\tests\testDebugUnitTest\index.html"
-    if ($fail -gt 0) { exit 1 } else { exit 0 }
+    if ($rows.Count -eq 0) { Write-Host 'No test results found - did the build fail?'; exit 1 }
+    if ($fail -gt 0) { exit 1 }
+    if ($Strict -and $known -gt 0) { Write-Host 'Strict mode: open known defects fail the release gate.'; exit 1 }
+    exit 0
 } finally {
     Pop-Location
 }

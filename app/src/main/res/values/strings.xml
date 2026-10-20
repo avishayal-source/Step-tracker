@@ -20,7 +20,7 @@
     <string name="onboarding_ai_header">AI Disclaimer</string>
     <string name="onboarding_not_medical_header">Not a Medical App</string>
     <string name="onboarding_legal_header">Terms &amp; Privacy</string>
-    <string name="onboarding_legal_body">Your workout data stays on your device. Please read the full documents before continuing.</string>
+    <string name="onboarding_legal_body">Your workout data stays on your device (and your paired watch, if you use the Y Walk watch app). Please read the full documents before continuing.</string>
     <string name="onboarding_permissions_header">Permissions we\u2019ll request</string>
     <string name="onboarding_permissions_body">\u2022 Activity recognition \u2014 to count steps and detect walking vs running.\n\u2022 Notifications (optional) \u2014 for workout reminders if you use a training plan.\n\nLocation is optional and only used during active tracking to improve distance accuracy.</string>
     <string name="onboarding_consent_checkbox">I have read and agree to the Terms of Service and Privacy Policy, and I understand the Health and AI disclaimers above.</string>
@@ -55,7 +55,7 @@
     <string name="health_disclaimer">Not medical advice. Botty uses on-device rules based on general training principles. Consult a doctor before starting a new exercise programme. Stop if you feel pain, dizziness, or chest discomfort.</string>
 
     <string name="permission_rationale_title">Permissions needed</string>
-    <string name="permission_rationale_message">Y Walk needs:\n\n• Activity recognition — to count steps and detect walking vs running.\n\n• Location (optional) — to measure distance more accurately while you track. Denying location still allows step-based tracking.\n\n• Notifications (optional) — for workout reminders if you use a training plan.\n\nYour workout data stays on this device and is not sent to our servers.\n\nYou will only see this when a permission is still missing — not every time you press Start.</string>
+    <string name="permission_rationale_message">Y Walk needs:\n\n• Activity recognition — to count steps and detect walking vs running.\n\n• Location (optional) — to measure distance more accurately while you track. Denying location still allows step-based tracking.\n\n• Notifications (optional) — for workout reminders if you use a training plan.\n\nYour workout data stays on this device (and your paired watch, if you use the Y Walk watch app) and is not sent to our servers.\n\nYou will only see this when a permission is still missing — not every time you press Start.</string>
     <string name="permission_rationale_continue">Continue</string>
     <string name="permission_rationale_cancel">Not now</string>
     <string name="cd_close_calibration">Close calibration</string>
@@ -66,6 +66,8 @@
     <string name="battery_unrestricted_message">On Pixel and some other phones, battery saving can pause sensors when the screen is off.\n\nAllow Y Walk to run unrestricted so walks and runs keep counting in the background. You can change this later in system settings.</string>
     <string name="battery_unrestricted_allow">Allow</string>
     <string name="battery_unrestricted_not_now">Not now</string>
+    <string name="battery_menu_title">Background tracking</string>
+    <string name="battery_already_unrestricted">Y Walk already runs unrestricted, so tracking continues with the screen off.</string>
     <string name="battery_unrestricted_open_settings_fail">Open Settings → Apps → Y Walk → Battery and choose Unrestricted.</string>
 
     <string name="more_menu_desc">More options</string>
@@ -73,9 +75,9 @@
     <string name="calibrate_button_desc">Calibrate step length</string>
     <string name="about_menu_title">About</string>
     <string name="about_title">About Y Walk</string>
-    <string name="about_body">Beta V%1$s\n\nBuild %2$d\nPackage %3$s\n\nClosed testing release. Workout data stays on this device.</string>
+    <string name="about_body">Beta V%1$s\n\nBuild %2$d\nPackage %3$s\n\nClosed testing release. Workout data stays on this device and your paired watch.</string>
     <string name="backup_section_title">BACKUP</string>
-    <string name="backup_section_hint">Export or restore your data. Nothing is uploaded to Y Walk servers.</string>
+    <string name="backup_section_hint">Export or restore your data. Nothing is uploaded to Y Walk servers. The backup file is plain text that anyone who can open it can read — keep it private.</string>
     <string name="backup_export">Export backup</string>
     <string name="backup_restore">Restore backup</string>
     <string name="backup_export_ok">Backup saved</string>
@@ -84,5 +86,12 @@
     <string name="backup_restore_message">This will replace workouts, training plan, schedules, calibration, and Botty form data on this device.\n\nBackup from app %1$s · %2$d workouts · %3$d schedules%4$s</string>
     <string name="backup_restore_ok">Restore complete</string>
     <string name="backup_restore_fail">Could not restore: %1$s</string>
+    <string name="backup_restore_rejected">Backup not restored: %1$s. Your existing data was not changed.</string>
+    <string name="backup_restore_running">Restoring…</string>
+    <string name="interrupted_title">Workout interrupted</string>
+    <string name="interrupted_message">Android closed Y Walk during your workout. The last record is from %1$s (%2$d steps).\n\nContinue the workout, or save what was recorded to History?</string>
+    <string name="interrupted_continue">Continue</string>
+    <string name="interrupted_save">Save to History</string>
+    <string name="interrupted_auto_saved">A workout interrupted by Android was saved to History (%1$d steps).</string>
     <string name="backup_restore_confirm">Restore</string>
 </resources>

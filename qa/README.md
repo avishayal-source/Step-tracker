@@ -20,7 +20,10 @@ JVM tests live where Gradle expects them:
 - Tests named `defect_*` describe the **correct** behaviour and currently fail because
   of a known bug. When a bug is fixed its test turns green — leave it as a regression
   guard. `run-qa.ps1` reports them as `KNOWN DEFECT` and only exits non-zero for
-  *unexpected* failures.
+  *unexpected* failures; `-Strict` (used before a release) also fails on known defects.
+- CI (`.github/workflows/ci.yml`) builds both modules and runs the unit tests and lint on
+  every push and PR; the Play bundle workflow runs the unit tests before `bundleRelease`.
+- `qa/device/robustness.ps1` exits non-zero on any crash or ANR.
 - All randomness is seeded; a failing seed reproduces exactly.
 - Time-zone sensitive tests pin the zone (`TimeZoneRule`), default `Asia/Jerusalem`.
 
@@ -131,7 +134,7 @@ reworded to the new rules (`occasionalUser_goalRunWaitsForExtraBuildWeeks`,
 | 18 | Medium | Same user is offered the goal run after completing 9 of 26 sessions, with no readiness warning. | `defect_occasionalUser_isNotSentToTheGoalRunUnprepared` |
 | 19 | Medium | Calibrating during a slow walk (< ~107 steps/min, the detector counts two impacts per step) then walking normally tracks 1000 m as **560 m** (and the reverse ~doubles). Matters whenever GPS is absent. | `defect_calibratedAtSlowWalk_trackedAtNormalWalk_staysAccurate` |
 | 20 | Medium | Uncalibrated defaults assume 2 impacts per stride; the real log shows ~1.3 (walk) / ~1 (jog), so defaults are 20–27 % short (walk 0.38 vs 0.52 m, jog 0.60 vs 0.75 m per impact). | `defect_uncalibratedDefaults_matchRealImpactLengths` |
-| 21 | Medium | History keeps only the latest 365 sessions (`trimToMostRecent(365)`); older ones are deleted silently and "ALL TIME" totals shrink. Not unit-testable without Robolectric — see checklist. | — |
+| 21 | Medium | History keeps only the latest 365 sessions (`trimToMostRecent(365)`); older ones are deleted silently and "ALL TIME" totals shrink. **Fixed in round 4** (cap removed). | `qa03_*` |
 | 22 | Low | Back from a break with no runs in the previous 28 days, the pace line compares against older runs but still says "4-week average". | `defect_paceInsight_onlyClaimsFourWeekAverageWhenItIsOne` |
 
 Verified OK: hand-carry calibration (~2× length per impact) is rejected; easy-pace
@@ -164,3 +167,24 @@ pure logic is pinned in `QaReportRegressionTest`, lifecycle items need the devic
 | 15 | One corrupt saved schedule hid all of them, and the next save/delete erased them. Legacy History migration stopped at the first bad record. | Per-entry parsing; save/delete edit the raw array; corrupt root is backed up. Migration skips only bad records. | `st15_*` |
 | 16 | Step times used a continuously re-smoothed wall-clock offset, so clock changes bent step gaps. | `SensorClock` settles over 100 samples, then freezes. | `st16_*` |
 | 17 | Wake lock had a fixed 4 h timeout, never renewed, and was held while paused. | 2 h timeout renewed hourly while tracking; released on pause. | checklist |
+
+### Fourth round (deep-research report on the updated `main`, QA ids)
+
+All confirmed items are fixed. Pure logic is pinned in `QaRound4RegressionTest`; lifecycle
+items need the device checklist.
+
+| QA | Finding | Fix | Test |
+|---|---|---|---|
+| 01 | Restore deleted History, plan and schedules before reading the new data; a damaged file left the user with partial data. | The whole file is parsed and validated first (`BackupManager.parse`); History is replaced in one Room transaction; nothing is touched if anything is wrong. | `qa01_*` |
+| 02 | A workout in progress was lost if Android killed the process. | Service snapshots the session (`ActiveSessionStore`) every 10 s and on every state change. On restart it continues a recent session, otherwise saves it; on reopen the user can Continue or Save to History. | `qa02_*`, checklist |
+| 03 | History silently kept only the latest 365 sessions. | Cap removed. | `qa03_*` |
+| 04 | Backup export/import ran on the UI thread with no size limit. | Background thread; 10 MB / 20 000 workouts / 1 000 schedules limits. | `qa04_*` |
+| 05 | "Approximate location" showed "Location on" although GPS can't be used. | Status says approximate only, distance from steps. | checklist |
+| 06 | Battery-unrestricted prompt was marked as asked before the answer and never shown again. | Re-offered after 14 days, at most 3 declines; "Background tracking" in the menu. | `qa06_*` |
+| 07 | Privacy texts didn't mention watch sync or that backups are plain text. | Onboarding, rationale, About, privacy policy and backup hint updated. | — |
+| 08 | Encrypted-prefs fallback was silent. | Logged. | — |
+| 11 | Start before the service was bound did nothing. | Start launches the service / asks for permissions; Stop/Reset explain. | checklist |
+| 15/16 | No CI test gate; QA runner and device script never failed a build. | `ci.yml`, release-gate tests, `run-qa.ps1 -Strict`, ANR detection. | — |
+
+Deferred (product decisions): hard-coded strings in code (09), portrait lock (10),
+design items (12–14), README/license (17–18).

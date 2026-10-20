@@ -22,6 +22,8 @@ Y Walk is a fitness and activity tracker that provides personalized training rec
 
 4. Data storage and security
 • All data stays on your device unless you explicitly export or share it.
+• If you use the Y Walk watch app, today's planned workout is sent to your paired watch and completed watch sessions are sent back to your phone, directly over the Wear OS connection between your own devices.
+• Exported backup files are plain text; anyone who can open the file can read it.
 • Health profile and training plans are stored in encrypted preferences where supported by your device.
 • Workout history is stored in a local database on your device.
 • Cloud backup and device-to-device transfer of app data are disabled.

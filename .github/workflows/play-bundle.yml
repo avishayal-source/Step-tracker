@@ -37,10 +37,13 @@ jobs:
           chmod +x scripts/prepare-release-signing.sh
           ./scripts/prepare-release-signing.sh
 
-      - name: Build release bundle
+      - name: Unit tests (release gate)
         run: |
           chmod +x gradlew
-          ./gradlew :app:bundleRelease --no-daemon
+          ./gradlew :app:testDebugUnitTest --no-daemon
+
+      - name: Build release bundle
+        run: ./gradlew :app:bundleRelease --no-daemon
 
       - name: Upload AAB
         uses: actions/upload-artifact@v4

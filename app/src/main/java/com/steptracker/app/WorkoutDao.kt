@@ -19,6 +19,9 @@ interface WorkoutDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     fun insert(record: WorkoutRecord)
 
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    fun insertAll(records: List<WorkoutRecord>)
+
     @Query("DELETE FROM workouts WHERE id = :id")
     fun deleteById(id: Long)
 
@@ -27,14 +30,6 @@ interface WorkoutDao {
 
     @Query("SELECT COUNT(*) FROM workouts")
     fun count(): Int
-
-    // Trim to the most recent N sessions (keeps the table bounded).
-    @Query("""
-        DELETE FROM workouts WHERE id NOT IN (
-            SELECT id FROM workouts ORDER BY dateMs DESC LIMIT :keep
-        )
-    """)
-    fun trimToMostRecent(keep: Int)
 
     // ── Analytics ────────────────────────────────────────────────────────────
 

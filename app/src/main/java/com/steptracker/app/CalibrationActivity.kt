@@ -282,6 +282,7 @@ class CalibrationActivity : AppCompatActivity(), SensorEventListener {
 
     private fun startGpsUpdates() {
         val lm = locationManager ?: return
+        if (!hasFineLocation()) return
         // Network fixes are far too coarse to measure a 20 m stretch, so only GPS is used.
         tvGpsStatus.text = try {
             if (lm.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
@@ -291,6 +292,8 @@ class CalibrationActivity : AppCompatActivity(), SensorEventListener {
             } else {
                 "⚠ GPS is off — use a known distance"
             }
+        } catch (_: SecurityException) {
+            "⚠ Location permission denied"
         } catch (_: Exception) {
             "⚠ Could not start GPS"
         }
